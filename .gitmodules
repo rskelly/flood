@@ -1,0 +1,3 @@
+[submodule "libgeo"]
+	path = libgeo
+	url = https://github.com/rskelly/libgeo

@@ -21,8 +21,10 @@
 #include <sstream>
 #include <memory>
 #include <unordered_set>
+#include <thread>
+#include <functional>
 
-#include "ds/qtree.hpp"
+#include "ds/kdtree.hpp"
 #include "raster.hpp"
 #include "geo.hpp"
 
@@ -92,6 +94,14 @@ namespace geo {
 						m_value(value) {
 				}
 
+				double operator[](int idx) const {
+					switch(idx % 3) {
+					case 0: return m_col;
+					case 1: return m_row;
+					default: return 0;
+					}
+				}
+
 				double x() const {
 					return m_col;
 				}
@@ -146,7 +156,7 @@ namespace geo {
 				}
 
 				// Make a list of all the cells that are on the edges of this basin.
-				int computeEdges(Grid &grd, QTree<Cell>& edgeCells) {
+				int computeEdges(Grid &grd, KDTree<Cell>& edgeCells) {
 					int offset[4][2] = {{0, -1}, {-1, 0}, {1, 0}, {0, 1}};
 					const GridProps& props = grd.props();
 					int cols = props.cols();
@@ -160,7 +170,8 @@ namespace geo {
 									int ro = offset[i][1] + r;
 									if(co < 0 || ro < 0 || co >= cols || ro >= rows || 
 											(uint32_t) grd.getInt(co, ro) != m_id) {
-										edgeCells.addItem(Cell(m_id, c, r));
+										Cell cl(m_id, c, r);
+										edgeCells.add(cl);
 										++count;
 										break;
 									}
@@ -269,7 +280,7 @@ namespace geo {
 			};
 
 			class Config {
-			public:
+			private:
 				std::string m_input;
 				std::string m_vdir;
 				std::string m_rdir;
@@ -285,6 +296,7 @@ namespace geo {
 				std::vector<Basin> m_basinList;
 				std::vector<SpillPoint> m_spillPoints;
 
+			public:
 				Config(std::string &input, std::string &vdir, std::string &rdir,
 						std::string &spill, double start, double end, double step,
 						double minBasinArea, double maxSpillDist) :
@@ -299,6 +311,34 @@ namespace geo {
 				}
 
 				~Config() {
+				}
+
+				const std::string& input() const {
+					return m_input;
+				}
+
+				const std::string& vdir() const {
+					return m_vdir;
+				}
+
+				const std::string& rdir() const {
+					return m_rdir;
+				}
+
+				const std::string& spill() const {
+					return m_spill;
+				}
+
+				double start() const {
+					return m_start;
+				}
+
+				double end() const {
+					return m_end;
+				}
+
+				double step() const {
+					return m_step;
 				}
 
 				double minBasinArea() const {
@@ -452,7 +492,7 @@ namespace geo {
 
 					geo::util::Bounds bounds(0, 0, m_dem->props().cols(), m_dem->props().rows());
 
-					std::unordered_map<int, std::unique_ptr<QTree<Cell> > > trees;
+					std::unordered_map<int, std::unique_ptr<KDTree<Cell> > > trees;
 					std::unordered_set<int> seen;
 
 					// Compare each basin to each other basin.
@@ -469,37 +509,39 @@ namespace geo {
 							int count1 = 0;
 
 							if(trees.find(id0) == trees.end()) {
-								std::unique_ptr<QTree<Cell> > q(new QTree<Cell>(bounds, 5, 10));
+								std::unique_ptr<KDTree<Cell> > q(new KDTree<Cell>(2));
 								b0.computeEdges(buf, *q);
-								count0 = q->count();
+								count0 = q->size();
 								trees[id0] = std::move(q);
 							}
 							if(trees.find(id1) == trees.end()) {
-								std::unique_ptr<QTree<Cell> > q(new QTree<Cell>(bounds, 5, 10));
+								std::unique_ptr<KDTree<Cell> > q(new KDTree<Cell>(2));
 								b1.computeEdges(buf, *q);
-								count1 = q->count();
+								count1 = q->size();
 								trees[id1] = std::move(q);
 							}
 
 							// Compare the distances; save the ones that are near enough.
 							std::list<Cell> result;
-							std::unique_ptr<QTree<Cell> >& cells0 = count0 < count1 ? trees[id0] : trees[id1];
-							std::unique_ptr<QTree<Cell> >& cells1 = count0 < count1 ? trees[id1] : trees[id0];
+							std::unique_ptr<KDTree<Cell> >& cells0 = count0 < count1 ? trees[id0] : trees[id1];
+							std::unique_ptr<KDTree<Cell> >& cells1 = count0 < count1 ? trees[id1] : trees[id0];
 
-							cells0->reset();
-							Cell c0;
-							while(cells0->next(c0)) {
+							cells0->build();
+							cells1->build();
+
+							for(const Cell& c0 : cells0->items()) {
+							//while(cells0->next(c0)) {
 								//if(seen.find(c0->cellId()) != seen.end())
 								//	continue;
 								seen.insert(c0.cellId());
-								if(cells1->nearest(c0.x(), c0.y(), 1, std::back_inserter(result))) {
-									for(const Cell& c1 : result) {
-										//if(seen.find(c1->cellId()) != seen.end())
-										//	continue;
-										seen.insert(c1.cellId());
-										m_spillPoints.push_back(SpillPoint(c0, c1, elevation));
-									}
-									result.clear();
+								std::list<Cell> result;
+								std::list<double> dist;
+								cells1->knn(c0, 1, std::back_inserter(result), std::back_inserter(dist));
+								for(const Cell& c1 : result) {
+									//if(seen.find(c1->cellId()) != seen.end())
+									//	continue;
+									seen.insert(c1.cellId());
+									m_spillPoints.push_back(SpillPoint(c0, c1, elevation));
 								}
 							}
 						}
@@ -513,7 +555,7 @@ namespace geo {
 						g_debug("res " << rX << ", " << rY);
 						const Bounds& bs = m_dem->props().bounds();
 						for(auto& it : trees) {
-							std::unique_ptr<QTree<Cell> >& qt = it.second;
+							std::unique_ptr<KDTree<Cell> >& qt = it.second;
 							qt.reset();
 							Cell c;
 							while(qt->next(c)) {
@@ -589,6 +631,46 @@ namespace geo {
 				}
 			};
 
+			void worker(std::mutex& mtx, std::ofstream& ofs, std::queue<double>& elevations, Config& config) {
+
+				double elevation;
+				{
+					std::lock_guard<std::mutex> lk(mtx);
+					elevation = elevations.front();
+					elevations.pop();
+				}
+				
+				g_debug("Filling to " << elevation << " by step " << config.step());
+				
+				// Spill point ID. Needed?
+				uint32_t id = 0;
+				// To get the number of places.
+				double exp = std::pow(10, std::floor(-std::log10(config.step())) + 1.0);
+				
+				// The basin filename.
+				std::stringstream ss;
+				ss << config.rdir() << "/" << (int) (elevation * exp) << ".tif";
+				std::string rfile = ss.str();
+				
+				// Generate basins.
+				int basins = config.fillBasins(rfile, elevation);
+
+				// If desired, generate vectors.
+				if (basins > 0 && !config.vdir().empty()) {
+					ss.str(std::string());
+					ss << config.vdir() << "/" << (int) (elevation * exp) << ".sqlite";
+					std::string vfile = ss.str();
+					config.saveBasinVector(rfile, vfile);
+				}
+
+				// Find and output spill points.
+				if (basins > 1 && !config.spill().empty() && config.findSpillPoints(rfile, elevation) > 0) {
+					std::lock_guard<std::mutex> lk(mtx);
+					config.saveSpillPoints(&id, ofs);
+				}
+
+			}
+
 		} // util
 
 		/**
@@ -614,29 +696,24 @@ namespace geo {
 				config.findMinima();
 			}
 
-			Util::rm(spill);
-			std::ofstream ofs(spill);
-			ofs << "id,id1,x1,y1,id2,x2,y2,xmidpoint,ymidpoint,elevation,distance\n";
-
-			uint32_t id = 0;
-			double elevation = start;
-			while (elevation <= end) {
-				g_debug("Filling to " << elevation);
-				std::stringstream ss;
-				ss << rdir << "/" << (int) (elevation / step) << ".tif";
-				std::string rfile = ss.str();
-				int basins = config.fillBasins(rfile, elevation);
-				ss.str(std::string());
-				if (basins > 0 && !vdir.empty()) {
-					ss << vdir << "/" << (int) (elevation / step) << ".sqlite";
-					std::string vfile = ss.str();
-					config.saveBasinVector(rfile, vfile);
-				}
-				if (basins > 1 && !spill.empty() && config.findSpillPoints(rfile, elevation) > 0)
-					config.saveSpillPoints(&id, ofs);
-				elevation += step;
+			std::ofstream ofs;
+			if(!config.spill().empty()) {
+				Util::rm(spill);
+				ofs.open(spill);
+				ofs << "id,id1,x1,y1,id2,x2,y2,xmidpoint,ymidpoint,elevation,distance\n";
 			}
 
+			std::queue<double> elevations;
+			for(double e = start; e <= end; e += step)
+				elevations.push(e);
+
+			std::mutex mtx;
+			std::list<std::thread> threads;
+			for(int i = 0; i < t; ++i)
+				threads.push_back(std::thread(worker, std::ref(mtx), std::ref(ofs), std::ref(elevations), std::ref(config)));
+
+			for(std::thread& th : threads)
+				th.join();
 		}
 
 	} // flood
