@@ -5,7 +5,12 @@
  *      Author: rob
  */
 
+
 #include "flood_qgis.hpp"
+
+// Constants in flood_qgis.hpp needed in this include.
+#include "qgsdockwidget.h"
+
 
 const QString FloodPlugin::s_name = QObject::tr("Flood Plugin");
 const QString FloodPlugin::s_description = QObject::tr("Incremental flooding of raster terrains. Extracts raster and vector basins and locates spill points.");
@@ -51,11 +56,20 @@ void FloodPlugin::unload() {
 }
 
 void FloodPlugin::initGui() {
+
+	QgsDockWidget* w = new QgsDockWidget(tr("Flood"), m_qgis->mainWindow());
+	w->setObjectName("Flood");
+	w->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+	m_qgis->addDockWidget(Qt::LeftDockWidgetArea, w);
+
+	m_dockWidget = new Ui::FloodDockWidget();
+	m_dockWidget->setupUi(w);
+
 	m_action = new QAction(QIcon(""), tr("Flood"), this);
 	m_action->setWhatsThis(tr("Floods raster terrains to produce basins and spill points."));
-	connect(m_action, SIGNAL(triggered()), this, SLOT(StartOverlay()));
-	m_qgis_if->addRasterToolBarIcon(m_action);
-	m_qgis_if->addPluginToMenu(tr("&Flood"), m_action);
+	//connect(m_action, SIGNAL(triggered()), this, SLOT(StartOverlay()));
+	m_qgis->addRasterToolBarIcon(m_action);
+	m_qgis->addPluginToMenu(tr("&Flood"), m_action);
 }
 
 void FloodPlugin::StartOverlay() {
