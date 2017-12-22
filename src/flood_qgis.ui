@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>500</height>
+    <height>677</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -46,7 +46,7 @@
      </widget>
     </item>
     <item row="2" column="1">
-     <widget class="QgsDoubleSpinBox" name="spnStartelev">
+     <widget class="QgsDoubleSpinBox" name="spnStartElev">
       <property name="minimum">
        <double>-1000.000000000000000</double>
       </property>
@@ -79,19 +79,6 @@
       </property>
      </widget>
     </item>
-    <item row="4" column="1">
-     <widget class="QgsSpinBox" name="spnBasinArea">
-      <property name="minimum">
-       <number>1</number>
-      </property>
-      <property name="maximum">
-       <number>1000000</number>
-      </property>
-      <property name="value">
-       <number>1</number>
-      </property>
-     </widget>
-    </item>
     <item row="5" column="0">
      <widget class="QLabel" name="label_9">
       <property name="text">
@@ -100,7 +87,7 @@
      </widget>
     </item>
     <item row="5" column="1">
-     <widget class="QgsDoubleSpinBox" name="spnSpillDistance">
+     <widget class="QgsDoubleSpinBox" name="spnMaxSpillDist">
       <property name="maximum">
        <double>1000.000000000000000</double>
       </property>
@@ -153,33 +140,49 @@
     <item row="9" column="1">
      <widget class="QgsFileWidget" name="fleOutputSpill"/>
     </item>
-    <item row="11" column="0" colspan="2">
+    <item row="12" column="0" colspan="2">
      <layout class="QHBoxLayout" name="horizontalLayout_2">
       <property name="topMargin">
-       <number>25</number>
+       <number>10</number>
       </property>
       <item>
-       <widget class="QPushButton" name="pushButton">
+       <widget class="QCheckBox" name="chkOverwrite">
         <property name="text">
-         <string>PushButton</string>
+         <string>Overwrite</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="pushButton_2">
+       <widget class="QPushButton" name="btnStart">
         <property name="text">
-         <string>PushButton</string>
+         <string>Start</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnCancel">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>Cancel</string>
         </property>
        </widget>
       </item>
      </layout>
     </item>
-    <item row="12" column="0" colspan="2">
+    <item row="13" column="0" colspan="2">
      <widget class="QProgressBar" name="progressBar">
       <property name="value">
        <number>0</number>
       </property>
      </widget>
+    </item>
+    <item row="14" column="0" colspan="2">
+     <widget class="QListWidget" name="lstCompleted"/>
+    </item>
+    <item row="4" column="1">
+     <widget class="QgsDoubleSpinBox" name="spnMinBasinArea"/>
     </item>
    </layout>
   </widget>
