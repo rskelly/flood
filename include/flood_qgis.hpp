@@ -52,6 +52,7 @@ private:
 	QString m_outputSpillPoints;
 	double m_startElev;
 	double m_endElev;
+	double m_step;
 	double m_minBasinArea;
 	double m_maxSpillDist;
 	int m_threads;
@@ -67,7 +68,7 @@ public:
 		m_action(nullptr),
 		m_dockWidget(nullptr),
 		m_inputRasterLayer(nullptr),
-		m_startElev(0), m_endElev(0),
+		m_startElev(0), m_endElev(0), m_step(0.0),
 		m_minBasinArea(1), m_maxSpillDist(20),
 		m_threads(1),
 		m_overwrite(false) {
@@ -92,6 +93,7 @@ public slots:
 	void setOutputSpillPoints(QString);
 	void setStartElevation(double);
 	void setEndElevation(double);
+	void setStep(double);
 	void setMinBasinArea(double);
 	void setMaxSpillDistance(double);
 	void setThreads(int);

@@ -10,6 +10,7 @@
 #include <QtGui/QAction>
 
 #include "flood_qgis.hpp"
+#include "flood.hpp"
 
 // Constants in flood_qgis.hpp needed in this include.
 #include <qgsdockwidget.h>
@@ -127,6 +128,7 @@ void FloodPlugin::setOutputSpillPoints(QString spillPoints) {
 void FloodPlugin::setStartElevation(double elev) {
 	m_startElev = elev;
 }
+
 void FloodPlugin::setEndElevation(double elev) {
 	m_endElev = elev;
 }
@@ -138,6 +140,10 @@ void FloodPlugin::setMaxSpillDistance(double dist) {
 	m_maxSpillDist = dist;
 }
 
+void FloodPlugin::setStep(double step) {
+	m_step = step;
+}
+
 void FloodPlugin::setThreads(int threads) {
 	m_threads = threads;
 }
@@ -146,8 +152,17 @@ void FloodPlugin::setOverwrite(bool overwrite) {
 	m_overwrite = overwrite;
 }
 
-void FloodPlugin::start() {}
-void FloodPlugin::cancel() {}
+void FloodPlugin::start() {
+	geo::flood::Flood config(m_inputRaster.toStdString(), m_inputSeeds.toStdString(),
+			m_outputVector.toStdString(), m_outputRaster.toStdString(),
+			m_outputSpillPoints.toStdString(),
+			m_startElev, m_endElev, m_step, m_minBasinArea, m_maxSpillDist);
+			config.flood(m_threads, false);
+}
+
+void FloodPlugin::cancel() {
+
+}
 
 
 void FloodDockWidget::setupUi(QgsDockWidget* widget) {
@@ -161,6 +176,7 @@ void FloodDockWidget::setupUi(QgsDockWidget* widget) {
 	connect(spnEndElev, SIGNAL(valueChanged(double)), m_plugin, SLOT(setEndElevation(double)));
 	connect(spnMinBasinArea, SIGNAL(valueChanged(int)), m_plugin, SLOT(setMinBasinArea(int)));
 	connect(spnMaxSpillDist, SIGNAL(valueChanged(double)), m_plugin, SLOT(setMaxSpillDistance(double)));
+	connect(spnStep, SIGNAL(valueChanged(double)), m_plugin, SLOT(setStep(double)));
 	connect(spnThreads, SIGNAL(valueChanged(int)), m_plugin, SLOT(setThreads(int)));
 	connect(chkOverwrite, SIGNAL(toggled(bool)), m_plugin, SLOT(setOverwrite(bool)));
 	connect(btnStart, SIGNAL(clicked()), m_plugin, SLOT(start()));

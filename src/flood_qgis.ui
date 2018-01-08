@@ -93,14 +93,14 @@
       </property>
      </widget>
     </item>
-    <item row="6" column="0">
+    <item row="7" column="0">
      <widget class="QLabel" name="label_10">
       <property name="text">
        <string>Threads</string>
       </property>
      </widget>
     </item>
-    <item row="6" column="1">
+    <item row="7" column="1">
      <widget class="QgsSpinBox" name="spnThreads">
       <property name="minimum">
        <number>1</number>
@@ -110,37 +110,37 @@
       </property>
      </widget>
     </item>
-    <item row="7" column="0">
+    <item row="8" column="0">
      <widget class="QLabel" name="label_4">
       <property name="text">
        <string>Raster Directory</string>
       </property>
      </widget>
     </item>
-    <item row="7" column="1">
+    <item row="8" column="1">
      <widget class="QgsFileWidget" name="fleOutputRaster"/>
     </item>
-    <item row="8" column="0">
+    <item row="9" column="0">
      <widget class="QLabel" name="label_3">
       <property name="text">
        <string>Vector Directory</string>
       </property>
      </widget>
     </item>
-    <item row="8" column="1">
+    <item row="9" column="1">
      <widget class="QgsFileWidget" name="fleOutputVector"/>
     </item>
-    <item row="9" column="0">
+    <item row="10" column="0">
      <widget class="QLabel" name="label_5">
       <property name="text">
        <string>Spill Point File</string>
       </property>
      </widget>
     </item>
-    <item row="9" column="1">
+    <item row="10" column="1">
      <widget class="QgsFileWidget" name="fleOutputSpill"/>
     </item>
-    <item row="12" column="0" colspan="2">
+    <item row="13" column="0" colspan="2">
      <layout class="QHBoxLayout" name="horizontalLayout_2">
       <property name="topMargin">
        <number>10</number>
@@ -171,18 +171,44 @@
       </item>
      </layout>
     </item>
-    <item row="13" column="0" colspan="2">
+    <item row="14" column="0" colspan="2">
      <widget class="QProgressBar" name="progressBar">
       <property name="value">
        <number>0</number>
       </property>
      </widget>
     </item>
-    <item row="14" column="0" colspan="2">
+    <item row="15" column="0" colspan="2">
      <widget class="QListWidget" name="lstCompleted"/>
     </item>
     <item row="4" column="1">
      <widget class="QgsDoubleSpinBox" name="spnMinBasinArea"/>
+    </item>
+    <item row="6" column="0">
+     <widget class="QLabel" name="label_11">
+      <property name="text">
+       <string>Step Elevation</string>
+      </property>
+     </widget>
+    </item>
+    <item row="6" column="1">
+     <widget class="QgsDoubleSpinBox" name="spnStep">
+      <property name="decimals">
+       <number>4</number>
+      </property>
+      <property name="minimum">
+       <double>0.000100000000000</double>
+      </property>
+      <property name="maximum">
+       <double>100000.000000000000000</double>
+      </property>
+      <property name="singleStep">
+       <double>0.010000000000000</double>
+      </property>
+      <property name="value">
+       <double>0.010000000000000</double>
+      </property>
+     </widget>
     </item>
    </layout>
   </widget>
