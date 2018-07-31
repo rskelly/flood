@@ -39,7 +39,7 @@ namespace geo {
 			/**
 			 * Maintains the IDs for cells in the raster.
 			 */
-			static uint64_t _cellId = 0;
+			static size_t _cellId = 0;
 
 			/**
 			 * Reads a line from a CSV stream into a vector of values.
@@ -68,7 +68,7 @@ namespace geo {
 			private:
 				int m_col;
 				int m_row;
-				uint64_t m_cellId;
+				size_t m_cellId;
 				double m_value;
 
 			public:
@@ -99,7 +99,7 @@ namespace geo {
 				 * @param col The column.
 				 * @param row The row.
 				 */
-				Cell(uint64_t id, int col, int row) :
+				Cell(size_t id, int col, int row) :
 						m_col(col), m_row(row),
 						m_cellId(id),
 						m_value(0) {
@@ -112,7 +112,7 @@ namespace geo {
 				 * @param row The row.
 				 * @param value The value.
 				 */
-				Cell(uint64_t id, int col, int row, double value) :
+				Cell(size_t id, int col, int row, double value) :
 						m_col(col), m_row(row),
 						m_cellId(id),
 						m_value(value) {
@@ -158,7 +158,7 @@ namespace geo {
 					return m_col;
 				}
 
-				uint64_t cellId() const {
+				size_t cellId() const {
 					return m_cellId;
 				}
 
@@ -166,6 +166,9 @@ namespace geo {
 					return m_value;
 				}
 
+				/**
+				 * Return the distance between cells in map units, given the resolution of the original raster.
+				 */
 				double distance(const Cell& other, double resx, double resy) const {
 					double x0 = col() * resx;
 					double y0 = row() * resy;
@@ -185,6 +188,7 @@ namespace geo {
 				int m_maxc;
 				int m_maxr;
 				int m_area;
+				int m_band;
 
 			public:
 
@@ -192,7 +196,8 @@ namespace geo {
 						m_id(id),
 						m_minc(minc), m_minr(minr),
 						m_maxc(maxc), m_maxr(maxr),
-						m_area(area) {
+						m_area(area),
+						m_band(1) {
 				}
 
 				// Make a list of all the cells that are on the edges of this basin.
@@ -204,14 +209,13 @@ namespace geo {
 					int count = 0;
 					for (int r = m_minr; r <= m_maxr; ++r) {
 						for (int c = m_minc; c <= m_maxc; ++c) {
-							if ((uint32_t) grd.getInt(c, r) == m_id) {
+							if ((uint32_t) grd.getInt(c, r, m_band) == m_id) {
 								for (int i = 0; i < 4; ++i) {
 									int co = offset[i][0] + c;
 									int ro = offset[i][1] + r;
 									if(co < 0 || ro < 0 || co >= cols || ro >= rows ||
-											(uint32_t) grd.getInt(co, ro) != m_id) {
-										Cell cl(m_id, c, r);
-										edgeCells.add(cl);
+											(uint32_t) grd.getInt(co, ro, m_band) != m_id) {
+										edgeCells.add(new Cell(m_id, c, r));
 										++count;
 										break;
 									}
@@ -238,29 +242,34 @@ namespace geo {
 				double m_nodata;
 				uint32_t m_id;
 				int m_nofill;
+				int m_srcBand;
+				int m_dstBand;
 
 			public:
 
-				LEFillOperator(Grid* src, Grid* dst, double elevation, uint32_t id) :
+				LEFillOperator(Grid* src, int srcBand, Grid* dst, int dstBand, double elevation, uint32_t id) :
 					m_src(src),
 					m_dst(dst),
 					m_elevation(elevation),
 					m_id(id),
-					m_nofill(0) {
+					m_nofill(0),
+					m_srcBand(srcBand),
+					m_dstBand(dstBand) {
+
 					m_nodata = src->props().nodata();
 				}
 
 				bool shouldFill(int col, int row) const {
-					int fill = m_dst->getInt(col, row);
+					int fill = m_dst->getInt(col, row, m_srcBand);
 					if(fill == m_nofill) {
-						double value = m_src->getFloat(col, row);
+						double value = m_src->getFloat(col, row, m_srcBand);
 						return value != m_nodata && value <= m_elevation;
 					}
 					return false;
 				}
 
 				void fill(int col, int row) const {
-					m_dst->setInt(col, row, (int) m_id);
+					m_dst->setInt(col, row, (int) m_id, m_dstBand);
 				}
 
 				void setFill(uint32_t fill) {
@@ -284,7 +293,6 @@ namespace geo {
 			};
 
 			// Represents a spill point between two cells.
-
 			class SpillPoint {
 			private:
 				Cell m_c1;
@@ -292,6 +300,9 @@ namespace geo {
 				double m_elevation;
 			public:
 
+				/**
+				 * Create a spill point. Copies the given cells.
+				 */
 				SpillPoint(const Cell& c1, const Cell& c2, double elevation) :
 						m_c1(c1),
 						m_c2(c2),
@@ -310,6 +321,9 @@ namespace geo {
 					return m_elevation;
 				}
 
+				/**
+				 * Return the centroid of the line connecting the two cells.
+				 */
 				void centroid(int* col, int* row) const {
 					*col = (int) (m_c1.col() + (m_c2.col() - m_c1.col()) / 2.0);
 					*row = (int) (m_c1.row() + (m_c2.row() - m_c2.row()) / 2.0);
@@ -331,12 +345,14 @@ namespace geo {
 			double m_minBasinArea;
 			double m_maxSpillDist;
 			int m_t; // number of threads
+			int m_band;
 			MemRaster* m_dem;
 			std::string m_input;
 			std::string m_vdir;
 			std::string m_rdir;
 			std::string m_spill;
 			std::string m_fseeds;
+			std::string m_outfile;
 			std::vector<Cell> m_seeds;
 			std::vector<Basin> m_basinList;
 			std::vector<SpillPoint> m_spillPoints;
@@ -344,26 +360,45 @@ namespace geo {
 		public:
 			static bool cancel;
 
+			/**
+			 * Create a Flood object.
+			 *
+			 * @param input The DEM file.
+			 * @param vdir The vector output directory. If not given, no vectors are produced.
+			 * @param rdir The raster output directory.
+			 * @param spill The spill points file. CSV or SHP.
+			 * @param seeds The seeds file. CSV.
+			 * @param outfile If the height flag was specified, the output file can be used to direct the single output file.
+			 * @param start The starting elevation.
+			 * @param end The ending elevation.
+			 * @param step The step elevation.
+			 * @param minBasinArea The minimum area of a region to be considered a basing for connectivity purposes.
+			 * @param maxSpillDist The maximum distance between two basins before they are suspected of connecting.
+			 */
 			Flood(const std::string& input, const std::string& vdir, const std::string& rdir,
-					const std::string& spill, const std::string& seeds,
+					const std::string& spill, const std::string& seeds, const std::string& outfile,
 					double start, double end, double step,
 					double minBasinArea, double maxSpillDist) :
 						m_start(start), m_end(end), m_step(step),
 						m_minBasinArea(minBasinArea),
 						m_maxSpillDist(maxSpillDist),
 						m_t(1),
+						m_band(1),
 						m_dem(nullptr),
 						m_input(input),
 						m_vdir(vdir),
 						m_rdir(rdir),
 						m_spill(spill),
-						m_fseeds(seeds) {
+						m_fseeds(seeds),
+						m_outfile(outfile) {
 			}
 
+			/**
+			 * Copy the given Flood object.
+			 */
 			Flood(const Flood& conf) :
-				Flood(conf.m_input, conf.m_vdir, conf.m_rdir,
-						conf.m_spill, conf.m_fseeds, conf.m_start, conf.m_end, conf.m_step,
-						conf.m_minBasinArea, conf.m_maxSpillDist) {
+				Flood(conf.m_input, conf.m_vdir, conf.m_rdir, conf.m_spill, conf.m_fseeds, conf.m_outfile,
+					conf.m_start, conf.m_end, conf.m_step, conf.m_minBasinArea, conf.m_maxSpillDist) {
 				// Copy the thread count.
 				m_t = conf.m_t;
 			}
@@ -372,14 +407,17 @@ namespace geo {
 
 				g_debug("Checking...");
 
-				if(m_start >= m_end)
+				if(m_start > m_end)
 					throw std::runtime_error("End elevation must be larger than start.");
 
 				if(m_step <= 0)
 					throw std::runtime_error("Step must be greater than zero.");
 
+				if(m_start != m_end && !m_outfile.empty())
+					throw std::runtime_error("The output file is specified, but there will be more than one output. This is not allowed.");
+
 				if(m_minBasinArea < 0)
-					throw std::runtime_error("Minimum basin area must be greater than or equal tot zero.");
+					throw std::runtime_error("Minimum basin area must be greater than or equal to zero.");
 
 				if(m_maxSpillDist <= 0)
 					throw std::runtime_error("Maximum spill distance must be larger than zero.");
@@ -399,6 +437,7 @@ namespace geo {
 				unsigned int threads = std::thread::hardware_concurrency();
 				if(m_t < 1)
 					throw std::runtime_error("Threads must be greater than zero.");
+
 				if(threads > 0 && m_t > threads)
 					throw std::runtime_error("Threads must be less than or equal to the number of available cores.");
 
@@ -410,15 +449,27 @@ namespace geo {
 
 				if(!m_vdir.empty() && !Util::exists(m_vdir))
 					Util::mkdir(m_vdir);
+
 				if(!m_vdir.empty() && !Util::exists(m_vdir))
 					throw std::runtime_error("Vector output directory does not exist and could not be created.");
 
-				if(m_rdir.empty())
+				if(m_outfile.empty() && m_rdir.empty())
 					throw std::runtime_error("Raster output directory not given.");
-				if(!Util::exists(m_rdir))
-					Util::mkdir(m_rdir);
-				if(!Util::exists(m_rdir))
-					throw std::runtime_error("Raster output directory does not exist and could not be created.");
+
+				if(!m_outfile.empty()) {
+					std::string dir = Util::parent(m_outfile);
+					if(!Util::exists(dir))
+						Util::mkdir(dir);
+					if(!Util::exists(dir))
+						throw std::runtime_error("Failed to create directory for output file.");
+				}
+
+				if(!m_rdir.empty()) {
+					if(!Util::exists(m_rdir))
+						Util::mkdir(m_rdir);
+					if(!Util::exists(m_rdir))
+						throw std::runtime_error("Raster output directory does not exist and could not be created.");
+				}
 
 				if(!Util::exists(m_fseeds))
 					throw std::runtime_error("Seeds file does not exists.");
@@ -468,6 +519,10 @@ namespace geo {
 				return m_maxSpillDist;
 			}
 
+			/**
+			 * Load the seeds from the seeds file. If header is given,
+			 * the first row is read and discarded.
+			 */
 			void loadSeeds(bool header = false) {
 				if (m_fseeds.empty())
 					g_argerr("No seed file given.");
@@ -477,11 +532,11 @@ namespace geo {
 					readline(csv, row);
 				const GridProps &props = m_dem->props();
 				while (readline(csv, row)) {
-					uint32_t id = (uint32_t) atoi(row[0].c_str());
-					double x = atof(row[1].c_str());
-					double y = atof(row[2].c_str());
+					uint32_t id = (uint32_t) std::strtol(row[0].c_str(), nullptr, 10);
+					double x = std::strtod(row[1].c_str(), nullptr);
+					double y = std::strtod(row[2].c_str(), nullptr);
 					g_debug("Found seed: " << id << ", " << x << ", " << y << ", " << props.toCol(x) << ", " << props.toRow(y));
-					m_seeds.push_back(Cell(id, props.toCol(x), props.toRow(y)));
+					m_seeds.emplace_back(id, props.toCol(x), props.toRow(y));
 				}
 			}
 
@@ -493,6 +548,12 @@ namespace geo {
 				return m_dem;
 			}
 
+			/**
+			 * Initialize the flood processor.
+			 *
+			 * @param mtx A mutex to protect resources.
+			 * @param mapped Set to true to use file-mapped memory.
+			 */
 			void init(std::mutex& mtx, bool mapped) {
 
 				validateInputs();
@@ -520,7 +581,7 @@ namespace geo {
 					m_end = g_min(stats.max, m_end);
 				}
 				g_debug("Stats: " << stats.min << ", " << stats.max);
-				if (m_end <= m_start)
+				if (m_end < m_start)
 					g_argerr("The ending elevation must be larger than the starting elevation: " << m_start << ", " << m_end);
 			}
 
@@ -534,18 +595,22 @@ namespace geo {
 			int fillBasins(std::string &filename, double elevation, bool mapped) {
 				g_debug("Filling basins: " << filename << "; " << elevation);
 
+				// Set up the output raster.
 				GridProps props(m_dem->props());
 				props.setBands(1);
 				props.setNoData(0);
 				props.setDataType(DataType::UInt32);
 				props.setWritable(true);
+				props.setCompress(true);
 				MemRaster basins(props, mapped);
-				basins.fillInt(0);
+				basins.fillInt(0, m_band);
 				m_basinList.clear();
 
-				LEFillOperator op(m_dem, &basins, elevation, 0);
+				// Set up the fill operator.
+				LEFillOperator op(m_dem, 1, &basins, 1, elevation, 0);
 				op.setNoFill(0);
 
+				// Iterate over the seeds.
 				for (const Cell& seed : seeds()) {
 
 					if(Flood::cancel)
@@ -556,7 +621,7 @@ namespace geo {
 						continue;
 					}
 
-					// Fill the basin based on the elevations in dem.
+					// Fill the basin based on the elevations in the DEM.
 					int minc, minr, maxc, maxr, area;
 					op.setFill(seed.cellId());
 					Grid::floodFill(seed.col(), seed.row(), op, false, &minc, &minr, &maxc, &maxr, &area);
@@ -564,11 +629,11 @@ namespace geo {
 					if (area >= minBasinArea()) {
 						// If it's large enough, save the basin.
 						g_debug("Good Seed: " << seed.col() << ", " << seed.row() << "; elevation: " << elevation << "; basin area: " << area);
-						m_basinList.push_back(Basin(seed.cellId(), minc, minr, maxc, maxr, area));
+						m_basinList.emplace_back(seed.cellId(), minc, minr, maxc, maxr, area);
 					} else if(area > 0){
 						g_debug("Bad Seed: " << seed.col() << ", " << seed.row() << "; elevation: " << elevation << "; basin area: " << area);
 						// If the basin is too small, fill it with nodata. Do not collect more spill points.
-						TargetFillOperator<double, int> fop(m_dem, &basins, seed.cellId(), props.nodata());
+						TargetFillOperator<double, int> fop(m_dem, m_band, &basins, m_band, seed.cellId(), props.nodata());
 						Grid::floodFill(seed.col(), seed.row(), fop, false, &minc, &minr, &maxc, &maxr, &area);
 					}
 
@@ -582,6 +647,13 @@ namespace geo {
 				return m_basinList.size();
 			}
 
+			class FloodCallbacks : public geo::util::Callbacks {
+			public:
+				void stepCallback(float status) const {}
+				void overallCallback(float status) const {}
+				void statusCallback(const std::string& msg) const {}
+		   };
+
 			/**
 			 * Vectorize the given raster.
 			 * @param rfile the raster file.
@@ -590,7 +662,9 @@ namespace geo {
 			void saveBasinVector(const std::string& rfile, const std::string& vfile) {
 				g_debug("Saving vector " << vfile);
 				Raster rast(rfile);
-				rast.polygonize(vfile, "basin", "SQLite", rast.props().hsrid(), 1, false, false, nullptr, &Flood::cancel);
+				FloodCallbacks cb;
+				geo::util::Status status(&cb, 0.0f, 1.0f);
+				rast.polygonize(vfile, "basin", "SQLite", rast.props().hsrid(), 1, false, false, "", 0, 1, Flood::cancel, status);
 			}
 
 			bool findSpillPoints(const std::string& rfile, double elevation) {
@@ -599,13 +673,13 @@ namespace geo {
 				m_spillPoints.clear();
 
 				Raster basins(rfile);
-				MemRaster buf(basins.props(), false);
+				MemRaster buf(basins.props(), true); // TODO: Configure mapped.
 				for(int r = 0; r < basins.props().rows(); ++r)
 					basins.writeTo(buf, basins.props().cols(), 1, 0, r, 0, r);
 
 				geo::util::Bounds bounds(0, 0, m_dem->props().cols(), m_dem->props().rows());
 
-				std::unordered_map<int, std::unique_ptr<KDTree<Cell> > > trees;
+				std::unordered_map<int, KDTree<Cell> > trees;
 				std::unordered_set<int> seen;
 
 				// Compare each basin to each other basin.
@@ -618,41 +692,40 @@ namespace geo {
 						uint32_t id0 = b0.id();
 						uint32_t id1 = b1.id();
 
-						int count0 = 0;
-						int count1 = 0;
-
 						if(trees.find(id0) == trees.end()) {
-							std::unique_ptr<KDTree<Cell> > q(new KDTree<Cell>(2));
-							b0.computeEdges(buf, *q);
-							q->build();
-							count0 = q->size();
-							trees[id0] = std::move(q);
+							trees.emplace(id0, 2);
+							KDTree<Cell>& q = trees[id0];
+							b0.computeEdges(buf, q);
+							q.build();
 						}
 						if(trees.find(id1) == trees.end()) {
-							std::unique_ptr<KDTree<Cell> > q(new KDTree<Cell>(2));
-							b1.computeEdges(buf, *q);
-							q->build();
-							count1 = q->size();
-							trees[id1] = std::move(q);
+							trees.emplace(id1, 2);
+							KDTree<Cell>& q = trees[id1];
+							b1.computeEdges(buf, q);
+							q.build();
 						}
+
+						int count0 = trees[id0].size();
+						int count1 = trees[id1].size();
 
 						// Compare the distances; save the ones that are near enough.
 						std::list<Cell> result;
-						std::unique_ptr<KDTree<Cell> >& cells0 = count0 < count1 ? trees[id0] : trees[id1];
-						std::unique_ptr<KDTree<Cell> >& cells1 = count0 < count1 ? trees[id1] : trees[id0];
+						KDTree<Cell>& cells0 = count0 < count1 ? trees[id0] : trees[id1];
+						KDTree<Cell>& cells1 = count0 < count1 ? trees[id1] : trees[id0];
 
-						for(const Cell& c0 : cells0->items()) {
+						for(const Cell* c0 : cells0.items()) {
 							if(Flood::cancel)
 								break;
-							seen.insert(c0.cellId());
-							std::vector<Cell> result;
+							seen.insert(c0->cellId());
+							std::vector<Cell*> result;
 							std::vector<double> dist;
-							cells1->knn(c0, 1, std::back_inserter(result), std::back_inserter(dist));
+							cells1.knn(*c0, 1, std::back_inserter(result), std::back_inserter(dist));
 							for(size_t i = 0; i < result.size(); ++i) {
 								if(dist[i] > m_maxSpillDist)
 									continue;
-								seen.insert(result[i].cellId());
-								m_spillPoints.push_back(SpillPoint(c0, result[i], elevation));
+								seen.insert(result[i]->cellId());
+								// Create a spill point; copies the cells.
+								m_spillPoints.push_back(SpillPoint(*c0, *result[i], elevation));
 							}
 						}
 					}
@@ -700,19 +773,19 @@ namespace geo {
 					for (int c = 0; c < cols; ++c) {
 						bool skip = false;
 						double v;
-						if ((v = m_dem->getFloat(c, r)) == nodata)
+						if ((v = m_dem->getFloat(c, r, m_band)) == nodata)
 							continue;
 						for (int rr = g_max(0, r - 1); !skip && rr < g_min(r + 2, rows); ++rr) {
 							for (int cc = g_max(0, c - 1); !skip && cc < g_min(c + 2, cols) && !Flood::cancel; ++cc) {
 								double v0;
-								if ((cc == c && rr == r) || (v0 = m_dem->getFloat(cc, rr)) == nodata)
+								if ((cc == c && rr == r) || (v0 = m_dem->getFloat(cc, rr, m_band)) == nodata)
 									continue;
-								if (m_dem->getFloat(cc, rr) < m_dem->getFloat(c, r))
+								if (m_dem->getFloat(cc, rr, m_band) < m_dem->getFloat(c, r, m_band))
 									skip = true;
 							}
 						}
 						if (!skip)
-							m_seeds.push_back(Cell(c, r, m_dem->getFloat(c, r)));
+							m_seeds.push_back(Cell(c, r, m_dem->getFloat(c, r, m_band)));
 					}
 				}
 			}
@@ -805,12 +878,47 @@ namespace geo {
 				for(double e = start(); e <= end(); e += step())
 					elevations.push(e);
 
-				std::mutex mtx;
-				for(int i = 0; i < numThreads; ++i)
-					threads.push_back(std::thread(Flood::worker, &config, &mtx, &ofs, &elevations, memMapped));
+				if(m_start == m_end && !m_outfile.empty()) {
 
-				for(std::thread& th : threads)
-					th.join();
+					g_debug("Filling to " << m_end);
+
+					// Spill point ID. Needed?
+					uint32_t id = 0;
+
+					std::mutex mtx;
+					config.init(mtx, memMapped);
+
+					g_debug("Building seed list...");
+					if (!config.seedsFile().empty()) {
+						// Load the seeds if given.
+						config.loadSeeds(true);
+					} else {
+						// Otherwise find and use minima.
+						config.findMinima();
+					}
+
+					// Generate basins.
+					int basins = config.fillBasins(m_outfile, m_end, memMapped);
+
+					// If desired, generate vectors.
+					if (basins > 0 && !config.vdir().empty()) {
+						std::string vec = Util::pathJoin(Util::parent(m_outfile), Util::basename(m_outfile) + ".sqlite");
+						config.saveBasinVector(m_outfile, vec);
+					}
+
+					// Find and output spill points.
+					if (basins > 1 && !config.spill().empty() && config.findSpillPoints(m_outfile, m_end) > 0) {
+						config.saveSpillPoints(&id, ofs);
+					}
+
+				} else {
+					std::mutex mtx;
+					for(int i = 0; i < numThreads; ++i)
+						threads.emplace_back(Flood::worker, &config, &mtx, &ofs, &elevations, memMapped);
+
+					for(std::thread& th : threads)
+						th.join();
+				}
 			}
 
 		};

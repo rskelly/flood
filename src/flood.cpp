@@ -40,8 +40,12 @@ void usage() {
 			<< " -v     Directory for basin vectors. If not given, they are not produced.\n"
 			<< " -r     Directory for basin rasters. If not given, they are produced.\n"
 			<< " -p     Spill point file. If not given, they are not produced. A Shapefile or CSV.\n"
+			<< " -o     Output file. This is only available if the -h (height) flag is used.\n"
 			<< " -start Starting elevation, in same units as input raster.\n"
-			<< " -end   Ending elevation.\n" << " -step  Step elevation.\n"
+			<< " -end   Ending elevation.\n"
+			<< " -step  Step elevation.\n"
+			<< " -h     Height. Performs only one flood operation at the specified height. If the -o flag \n"
+			<< "        is used, the output is saved to that file."
 			<< " -t     Number of threads to use. Default 1.\n"
 			<< " -b     Minimum basin area.\n"
 			<< " -d     Maximum spill distance.\n";
@@ -56,9 +60,12 @@ int main(int argc, char **argv) {
 	std::string vdir;
 	std::string rdir;
 	std::string spill;
+	std::string outfile;
 	double start = 0.0;
 	double end = 0.0;
 	double step = 0.0;
+	double height = 0.0;
+	bool hasHeight = false; // If true, start, end and step are disallowed.
 	double maxSpillDist = 100.0;
 	double minBasinArea = 100.0;
 	int t = 1;
@@ -74,6 +81,12 @@ int main(int argc, char **argv) {
 		} else if (a == "-r") {
 			rdir.assign(argv[++i]);
 		} else if (a == "-p") {
+			spill = argv[++i];
+		} else if (a == "-o") {
+			outfile = argv[++i];
+		} else if (a == "-h") {
+			height = atof(argv[++i]);
+			hasHeight = true;
 			spill.assign(argv[++i]);
 		} else if (a == "-start") {
 			start = atof(argv[++i]);
@@ -92,9 +105,17 @@ int main(int argc, char **argv) {
 
 	try {
 
-		geo::flood::Flood config(input, vdir, rdir, spill, seeds, start, end,
+		if(hasHeight) {
+			start = end = height;
+			step = 1;
+		} else {
+			if(!outfile.empty())
+				throw std::runtime_error("Output file is only for when the -h flag is specified.");
+		}
+
+		geo::flood::Flood config(input, vdir, rdir, spill, seeds, outfile, start, end,
 				step, minBasinArea, maxSpillDist);
-		config.flood(t, false);
+		config.flood(t, true);
 
 	} catch (const std::exception &e) {
 		std::cerr << e.what() << "\n";
