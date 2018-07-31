@@ -6,50 +6,44 @@ set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 set (CMAKE_CXX_EXTENSIONS OFF)
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -D_GLIBCXX_PARALLEL")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unknown-pragmas")
 
-#set (Boost_DEBUG OFF)
-#set (Boost_USE_STATIC_LIBS OFF)
-#set (Boost_USE_STATIC_RUNTIME OFF)
+if(APPLE)
+	# This does not use GCC.
+	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++ -Wno-unknown-pragmas -Wall -D_GLIBCXX_PARALLEL")
+else()
+	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fopenmp -Wno-unknown-pragmas -Wall -D_GLIBCXX_PARALLEL")
+endif()
+
+set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set (CMAKE_INSTALL_RPATH "/usr/local/lib")
+set (CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+set (CMAKE_CXX_COMPILER_LAUNCHER ccache)
 
 set (CMAKE_AUTOUIC ON)
 set (CMAKE_AUTOMOC ON)
 set (CMAKE_INCLUDE_CURRENT_DIR ON)
 set (CMAKE_AUTOMOC_OPTIONS "-Iinclude -Isrc")
 
+set (THREADS_PREFER_PTHREAD_FLAG ON)
+
+find_package (GDAL 2.2 REQUIRED)
+find_package (Qt5Widgets REQUIRED)
+find_library (GEOS_LIBRARY geos PATHS /opt/lib /usr/local/lib /usr/lib NO_CMAKE_SYSTEM_PATH)
+
 project (flood)
 add_subdirectory (libgeo)
 
-find_package (GDAL 2.2 REQUIRED)
-find_package (OpenMP REQUIRED) # Implies pthread?
-find_package (Qt4 REQUIRED QtCore QtGui QtXml)
+# Configure directories###################################################################################
 
-include (${QT_USE_FILE})
-
-qt4_wrap_ui(UISRC src/flood_qgis.ui)
-qt4_wrap_cpp(MOCSRC include/flood_qgis.hpp)
-
-#set (GEOS_LIBRARY /usr/lib/x86_64-linux-gnu/libgeos.a)
-
-if(OPENMP_FOUND)
-	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_C_FLAGS} -fopenmp")
-	set (CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_C_FLAGS} -fopenmp")
-endif()
-
-# Configure directories
-include_directories (BEFORE SYSTEM ${GDAL_INCLUDE_DIR})
-include_directories (BEFORE SYSTEM include)
-include_directories (BEFORE SYSTEM /usr/include/qgis)
-include_directories (BEFORE SYSTEM libgeo/include)
-include_directories (BEFORE SYSTEM libgeo/ann/include)
-include_directories (BEFORE SYSTEM /usr/include/eigen3)
-#link_directories (. ${Boost_LIBRARY_DIRS} ${GDAL_LIBRARY})
+include_directories(BEFORE SYSTEM ./include ./libgeo/include ./libgeo/ann/include /opt/include /usr/include/gdal /usr/include/eigen3) 
+link_directories(. /opt/lib /usr/local/lib /usr/lib)
 
 # Build libraries ####################################################################################################
 
-add_library(floodplugin SHARED src/flood_qgis.cpp ${MOCSRC} ${UISRC})
-target_link_libraries(floodplugin ${QT_LIBRARIES} qgis_app qgis_core)
+#add_library(floodplugin SHARED src/flood_qgis.cpp ${MOCSRC} ${UISRC})
+#target_link_libraries(floodplugin ${QT_LIBRARIES} qgis_app qgis_core)
 
 # Build programs #####################################################################################################
 
