@@ -47,7 +47,7 @@ link_directories(. /opt/lib /usr/local/lib /usr/lib)
 
 # Build programs #####################################################################################################
 
-add_executable (flood src/flood.cpp)
+add_executable (flood src/flood_app.cpp src/flood.cpp)
 target_link_libraries (flood ${GDAL_LIBRARY} geoann georaster geoutil)
 
 # Install ###########################################################################################################
