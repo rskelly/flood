@@ -70,6 +70,7 @@ namespace geo {
 				int m_row;
 				size_t m_cellId;
 				double m_value;
+				size_t m_seedId;
 
 			public:
 
@@ -79,7 +80,8 @@ namespace geo {
 				Cell() :
 						m_col(0), m_row(0),
 						m_cellId(++_cellId),
-						m_value(0) {
+						m_value(0),
+						m_seedId(0) {
 				}
 
 				/**
@@ -87,10 +89,11 @@ namespace geo {
 				 * @param col The column.
 				 * @param row The row.
 				 */
-				Cell(int col, int row) :
+				Cell(size_t seedId, int col, int row) :
 						m_col(col), m_row(row),
 						m_cellId(++_cellId),
-						m_value(0) {
+						m_value(0),
+						m_seedId(seedId) {
 				}
 
 				/**
@@ -99,10 +102,11 @@ namespace geo {
 				 * @param col The column.
 				 * @param row The row.
 				 */
-				Cell(size_t id, int col, int row) :
+				Cell(size_t id, size_t seedId, int col, int row) :
 						m_col(col), m_row(row),
 						m_cellId(id),
-						m_value(0) {
+						m_value(0),
+						m_seedId(seedId) {
 				}
 
 				/**
@@ -112,10 +116,11 @@ namespace geo {
 				 * @param row The row.
 				 * @param value The value.
 				 */
-				Cell(size_t id, int col, int row, double value) :
+				Cell(size_t id, size_t seedId, int col, int row, double value) :
 						m_col(col), m_row(row),
 						m_cellId(id),
-						m_value(value) {
+						m_value(value),
+						m_seedId(seedId) {
 				}
 
 				/**
@@ -124,10 +129,11 @@ namespace geo {
 				 * @param row The row.
 				 * @param value The value.
 				 */
-				Cell(int col, int row, double value) :
+				Cell(size_t seedId, int col, int row, double value) :
 						m_col(col), m_row(row),
 						m_cellId(++_cellId),
-						m_value(value) {
+						m_value(value),
+						m_seedId(seedId) {
 				}
 
 				/**
@@ -135,11 +141,11 @@ namespace geo {
 				 * @param idx The index
 				 */
 				double operator[](int idx) const {
-					switch(idx % 3) {
+					switch(idx % 2) {
 					case 0: return m_col;
 					case 1: return m_row;
-					default: return 0;
 					}
+					return 0;
 				}
 
 				double x() const {
@@ -160,6 +166,10 @@ namespace geo {
 
 				size_t cellId() const {
 					return m_cellId;
+				}
+
+				size_t seedId() const {
+					return m_seedId;
 				}
 
 				double value() const {
@@ -709,24 +719,26 @@ namespace geo {
 						int count1 = trees[id1].size();
 
 						// Compare the distances; save the ones that are near enough.
-						std::list<Cell> result;
 						KDTree<Cell>& cells0 = count0 < count1 ? trees[id0] : trees[id1];
 						KDTree<Cell>& cells1 = count0 < count1 ? trees[id1] : trees[id0];
+						std::vector<Cell*> result;
+						std::vector<double> dist;
+						double spillDist = m_maxSpillDist / std::abs(basins.props().resolutionX());
 
 						for(const Cell* c0 : cells0.items()) {
 							if(Flood::cancel)
 								break;
 							seen.insert(c0->cellId());
-							std::vector<Cell*> result;
-							std::vector<double> dist;
 							cells1.knn(*c0, 1, std::back_inserter(result), std::back_inserter(dist));
 							for(size_t i = 0; i < result.size(); ++i) {
-								if(dist[i] > m_maxSpillDist)
-									continue;
-								seen.insert(result[i]->cellId());
-								// Create a spill point; copies the cells.
-								m_spillPoints.push_back(SpillPoint(*c0, *result[i], elevation));
+								if(dist[i] <= spillDist) {
+									seen.insert(result[i]->cellId());
+									// Create a spill point; copies the cells.
+									m_spillPoints.emplace_back(*c0, *result[i], elevation);
+								}
 							}
+							result.resize(0);
+							dist.resize(0);
 						}
 					}
 				}
@@ -746,16 +758,16 @@ namespace geo {
 				for (const SpillPoint& sp : m_spillPoints) {
 					const Cell& c1 = sp.cell1();
 					const Cell& c2 = sp.cell2();
-					double x1 = c1.col() * resX + bounds.minx();
-					double y1 = c1.row() * resY + bounds.maxy();
+					double x1 = c1.col() * resX / 2.0 + bounds.minx();
+					double y1 = c1.row() * resY / 2.0 + bounds.maxy();
 					double x2 = c2.col() * resX + bounds.minx();
 					double y2 = c2.row() * resY + bounds.maxy();
 					double x3 = (x1 + x2) / 2.0;
 					double y3 = (y1 + y2) / 2.0;
 					double dist = std::sqrt(g_sq(x1 - x2) + g_sq(y1 - y2));
-					out << ++(*id) << ", " << c1.cellId() << "," << x1 << "," << y1 << "," << c2.cellId() << ","
+					out << ++(*id) << ", " << c1.seedId() << "," << x1 << "," << y1 << "," << c2.seedId() << ","
 							<< x2 << "," << y2 << "," << x3 << "," << y3 << ","
-							<< sp.elevation() << "," << dist << "\n";
+							<< sp.elevation() << "," << dist << std::endl;
 				}
 			}
 
@@ -785,7 +797,7 @@ namespace geo {
 							}
 						}
 						if (!skip)
-							m_seeds.push_back(Cell(c, r, m_dem->getFloat(c, r, m_band)));
+							m_seeds.push_back(Cell(0, c, r, m_dem->getFloat(c, r, m_band)));
 					}
 				}
 			}
@@ -872,7 +884,7 @@ namespace geo {
 				if(!config.spill().empty()) {
 					Util::rm(spill());
 					ofs.open(spill());
-					ofs << "id,id1,x1,y1,id2,x2,y2,xmidpoint,ymidpoint,elevation,distance\n";
+					ofs << "id,id1,x1,y1,id2,x2,y2,xmidpoint,ymidpoint,elevation,distance" << std::endl;
 				}
 
 				for(double e = start(); e <= end(); e += step())
