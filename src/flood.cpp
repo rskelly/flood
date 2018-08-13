@@ -209,12 +209,12 @@ LEFillOperator::~LEFillOperator(){}
 
 size_t _spillPointId = 0;
 
-SpillPoint::SpillPoint(const Cell& c1, const Cell& c2, double x, double y, double elevation) :
+SpillPoint::SpillPoint(const Cell& c1, const Cell& c2, double elevation, double x, double y, double z) :
 		m_id(++_spillPointId),
 		m_c1(c1),
 		m_c2(c2),
-		m_x(x), m_y(y),
-		m_elevation(elevation) {
+		m_elevation(elevation),
+		m_x(x), m_y(y), m_z(z) {
 }
 
 size_t SpillPoint::id() const {
@@ -235,6 +235,10 @@ double SpillPoint::x() const {
 
 double SpillPoint::y() const {
 	return m_y;
+}
+
+double SpillPoint::z() const {
+	return m_z;
 }
 
 double SpillPoint::elevation() const {
@@ -530,7 +534,7 @@ public:
 	}
 };
 
-bool Flood::findSpillPoints(MemRaster& basinRaster) {
+bool Flood::findSpillPoints(MemRaster& basinRaster, double elevation) {
 	g_debug("Finding spill points.");
 
 	m_spillPoints.clear();
@@ -643,7 +647,7 @@ bool Flood::findSpillPoints(MemRaster& basinRaster) {
 						if(success) {
 							seen.insert(result[i]->cellId());
 							// Create a spill point; copies the cells.
-							m_spillPoints.emplace_back(*c0, *result[i], minx, miny, minz);
+							m_spillPoints.emplace_back(*c0, *result[i], elevation, minx, miny, minz);
 							m_spillPoints[m_spillPoints.size() - 1].path.assign(dpath.begin(), dpath.end());
 						}
 					}
@@ -664,10 +668,17 @@ bool Flood::findSpillPoints(MemRaster& basinRaster) {
 	return m_spillPoints.size();
 }
 
+const std::unordered_map<std::string, FieldType> _spdbFields {
+	{"id", FieldType::FTInt}, {"elevation", FieldType::FTDouble},
+	{"id1", FieldType::FTInt}, {"id2", FieldType::FTInt},
+	{"x", FieldType::FTDouble}, {"y", FieldType::FTDouble}, {"z", FieldType::FTDouble},
+	{"x1", FieldType::FTDouble}, {"y1", FieldType::FTDouble}, {"x2", FieldType::FTDouble}, {"y2", FieldType::FTDouble},
+	{"xmidpoint", FieldType::FTDouble}, {"ymidpoint", FieldType::FTDouble}, {"distance", FieldType::FTDouble}
+};
+
 SPDB::SPDB(const std::string& file, const std::string& layer, const std::string& driver,
-		const std::unordered_map<std::string, FieldType>& fields,
 		GeomType type, int srid, bool replace) :
-				DB(file, layer, driver, fields, type, srid, replace) {}
+	DB(file, layer, driver, _spdbFields, type, srid, replace) {}
 
 void SPDB::addSpillPoint(const SpillPoint& sp, const GridProps& props) {
 	const geo::flood::util::Cell& c1 = sp.cell1();
@@ -682,11 +693,12 @@ void SPDB::addSpillPoint(const SpillPoint& sp, const GridProps& props) {
 
 	OGRFeature feat(m_fdef);
 	feat.SetField("id", (GIntBig) sp.id());
+	feat.SetField("elevation", sp.elevation());
 	feat.SetField("id1", (GIntBig) c1.seedId());
 	feat.SetField("id2", (GIntBig) c2.seedId());
 	feat.SetField("x", sp.x());
 	feat.SetField("y", sp.y());
-	feat.SetField("elevation", sp.elevation());
+	feat.SetField("z", sp.z());
 	feat.SetField("x1", x1);
 	feat.SetField("y1", y1);
 	feat.SetField("x2", x2);
@@ -783,7 +795,7 @@ void Flood::worker(Flood* config, bool main, std::mutex* mtx, SPDB* db, std::que
 		// Generate basins.
 		int basins = conf.fillBasins(basinRaster, elevation, mapped);
 
-		conf.findSpillPoints(*basinRaster);
+		conf.findSpillPoints(*basinRaster, elevation);
 		unsigned int id;
 		conf.saveSpillPoints(&id, *db);
 
@@ -819,23 +831,8 @@ void Flood::flood(int numThreads, bool memMapped) {
 	config.validateInputs();
 
 	std::unique_ptr<SPDB> db;
-	if(!config.spill().empty()) {
-		std::unordered_map<std::string, FieldType> fields;
-		fields["id"] = FieldType::FTInt;
-		fields["id1"] = FieldType::FTInt;
-		fields["id2"] = FieldType::FTInt;
-		fields["x"] = FieldType::FTDouble;
-		fields["y"] = FieldType::FTDouble;
-		fields["x1"] = FieldType::FTDouble;
-		fields["y1"] = FieldType::FTDouble;
-		fields["x2"] = FieldType::FTDouble;
-		fields["y2"] = FieldType::FTDouble;
-		fields["xmidpoint"] = FieldType::FTDouble;
-		fields["ymidpoint"] = FieldType::FTDouble;
-		fields["elevation"] = FieldType::FTDouble;
-		fields["distance"] = FieldType::FTDouble;
-		db.reset(new SPDB(spill(), "spillpoints", "sqlite", fields, GeomType::GTLine, 0, true));
-	}
+	if(!config.spill().empty())
+		db.reset(new SPDB(spill(), "spillpoints", "sqlite", GeomType::GTLine, 0, true));
 
 	for(double e = start(); e <= end(); e += step())
 		elevations.push(e);
@@ -862,7 +859,7 @@ void Flood::flood(int numThreads, bool memMapped) {
 		int basins = config.fillBasins(basinRaster, m_end, memMapped);
 
 		// Find and output spill points.
-		config.findSpillPoints(*basinRaster);
+		config.findSpillPoints(*basinRaster, m_end);
 
 		unsigned int id;
 		config.saveSpillPoints(&id, *db);

@@ -207,9 +207,10 @@ namespace geo {
 				size_t m_id;
 				Cell m_c1;
 				Cell m_c2;
+				double m_elevation;
 				double m_x;
 				double m_y;
-				double m_elevation;
+				double m_z;
 
 			public:
 				std::vector<double> path; ///<! The optimal spill path as triples of x, y, z.
@@ -219,7 +220,7 @@ namespace geo {
 				/**
 				 * Create a spill point. Copies the given cells.
 				 */
-				SpillPoint(const Cell& c1, const Cell& c2, double x, double y, double elevation);
+				SpillPoint(const Cell& c1, const Cell& c2, double elevation, double x, double y, double z);
 
 				const Cell& cell1() const;
 
@@ -228,6 +229,8 @@ namespace geo {
 				double x() const;
 
 				double y() const;
+
+				double z() const;
 
 				double elevation() const;
 
@@ -243,7 +246,6 @@ namespace geo {
 			class SPDB : public geo::db::DB {
 			public:
 				 SPDB(const std::string &file, const std::string &layer, const std::string &driver,
-					const std::unordered_map<std::string, FieldType> &fields,
 					GeomType type, int srid = 0, bool replace = false);
 				void addSpillPoint(const SpillPoint& sp, const GridProps& props);
 			};
@@ -368,7 +370,14 @@ namespace geo {
 			 */
 			void saveBasinVector(const std::string& rfile, const std::string& vfile);
 
-			bool findSpillPoints(MemRaster& basinRaster);
+			/**
+			 * Find the spill points between basins in the given raster.
+			 *
+			 * @param basinRaster The raster containing basins. Basins are contiguous regions with the same integer ID.
+			 * @param elevation The flood elevation used to create the basins.
+			 * @return True on success.
+			 */
+			bool findSpillPoints(MemRaster& basinRaster, double elevation);
 
 			/**
 			 * Output the spill points to a stream, with comma delimiters.
