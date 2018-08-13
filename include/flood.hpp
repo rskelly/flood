@@ -25,10 +25,12 @@
 
 #include "ds/kdtree.hpp"
 #include "raster.hpp"
+#include "db.hpp"
 #include "geo.hpp"
 
 using namespace geo::raster;
 using namespace geo::ds;
+using namespace geo::db;
 
 namespace geo {
 
@@ -202,19 +204,30 @@ namespace geo {
 			// Represents a spill point between two cells.
 			class SpillPoint {
 			private:
+				size_t m_id;
 				Cell m_c1;
 				Cell m_c2;
+				double m_x;
+				double m_y;
 				double m_elevation;
+
 			public:
+				std::vector<double> path; ///<! The optimal spill path as triples of x, y, z.
+
+				size_t id() const;
 
 				/**
 				 * Create a spill point. Copies the given cells.
 				 */
-				SpillPoint(const Cell& c1, const Cell& c2, double elevation);
+				SpillPoint(const Cell& c1, const Cell& c2, double x, double y, double elevation);
 
 				const Cell& cell1() const;
 
 				const Cell& cell2() const;
+
+				double x() const;
+
+				double y() const;
 
 				double elevation() const;
 
@@ -225,6 +238,14 @@ namespace geo {
 
 				~SpillPoint();
 
+			};
+
+			class SPDB : public geo::db::DB {
+			public:
+				 SPDB(const std::string &file, const std::string &layer, const std::string &driver,
+					const std::unordered_map<std::string, FieldType> &fields,
+					GeomType type, int srid = 0, bool replace = false);
+				void addSpillPoint(const SpillPoint& sp, const GridProps& props);
 			};
 
 		} // util
@@ -347,13 +368,13 @@ namespace geo {
 			 */
 			void saveBasinVector(const std::string& rfile, const std::string& vfile);
 
-			bool findSpillPoints(std::unique_ptr<MemRaster>& basinRaster, double elevation, bool mapped);
+			bool findSpillPoints(MemRaster& basinRaster);
 
 			/**
 			 * Output the spill points to a stream, with comma delimiters.
 			 * The fields are: ID1, x1, y1, ID2, x2, y2, midpoint x, midpoint y, distance
 			 */
-			void saveSpillPoints(unsigned int* id, std::ostream &out);
+			void saveSpillPoints(unsigned int* id, SPDB& db);
 
 			/**
 			 * Find the cells at the bottoms of depressions.
@@ -363,7 +384,7 @@ namespace geo {
 			/**
 			 * Called by flood, used by threads.
 			 */
-			static void worker(Flood* config, std::mutex* mtx, std::ofstream* ofs, std::queue<double>* elevations, bool mapped);
+			static void worker(Flood* config, bool main, std::mutex* mtx, SPDB* ofs, std::queue<double>* elevations, bool mapped);
 
 			/**
 			 * Start the flood process.

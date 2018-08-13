@@ -5,10 +5,11 @@
  *      Author: rob
  */
 
+#include "db.hpp"
 #include "flood.hpp"
 
 using namespace geo::flood::util;
-
+using namespace geo::db;
 
 /**
  * Maintains the IDs for cells in the raster.
@@ -22,7 +23,7 @@ static size_t _nextCellId() {
 }
 
 
-bool geo::flood::util::readline(std::istream &st, std::vector<std::string> &row) {
+bool geo::flood::util::readline(std::istream& st, std::vector<std::string>& row) {
 	row.clear();
 	std::string line;
 	std::getline(st, line);
@@ -206,11 +207,18 @@ const GridProps& LEFillOperator::dstProps() const {
 LEFillOperator::~LEFillOperator(){}
 
 
+size_t _spillPointId = 0;
 
-SpillPoint::SpillPoint(const Cell& c1, const Cell& c2, double elevation) :
+SpillPoint::SpillPoint(const Cell& c1, const Cell& c2, double x, double y, double elevation) :
+		m_id(++_spillPointId),
 		m_c1(c1),
 		m_c2(c2),
+		m_x(x), m_y(y),
 		m_elevation(elevation) {
+}
+
+size_t SpillPoint::id() const {
+	return m_id;
 }
 
 const geo::flood::util::Cell& SpillPoint::cell1() const {
@@ -219,6 +227,14 @@ const geo::flood::util::Cell& SpillPoint::cell1() const {
 
 const geo::flood::util::Cell& SpillPoint::cell2() const {
 	return m_c2;
+}
+
+double SpillPoint::x() const {
+	return m_x;
+}
+
+double SpillPoint::y() const {
+	return m_y;
 }
 
 double SpillPoint::elevation() const {
@@ -384,7 +400,7 @@ void Flood::loadSeeds(bool header) {
 	std::vector<std::string> row;
 	if (header)
 		geo::flood::util::readline(csv, row);
-	const GridProps &props = m_dem->props();
+	const GridProps& props = m_dem->props();
 	while (geo::flood::util::readline(csv, row)) {
 		unsigned int id = (unsigned int) std::strtol(row[0].c_str(), nullptr, 10);
 		double x = std::strtod(row[1].c_str(), nullptr);
@@ -491,14 +507,39 @@ void Flood::saveBasinVector(const std::string& rfile, const std::string& vfile) 
 	rast.polygonize(vfile, "basin", "SQLite", rast.props().hsrid(), 1, false, false, "", 0, 1, Flood::cancel, status);
 }
 
-bool Flood::findSpillPoints(std::unique_ptr<MemRaster>& basinRaster, double elevation, bool mapped) {
+class AStarCost {
+private:
+	double m_nodata;
+	Grid* m_dem;
+	int m_band;
+public:
+	AStarCost(Grid* dem, int band) :
+		m_nodata(dem->props().nodata()), m_dem(dem), m_band(band) {}
+	double operator()(size_t a, size_t b) {
+		int ac = (a >> 32) & 0xffffffff;
+		int ar = a & 0xffffffff;
+		int bc = (b >> 32) & 0xffffffff;
+		int br = b & 0xffffffff;
+		double az = m_dem->getFloat(ac, ar, m_band);
+		double bz = m_dem->getFloat(bc, br, m_band);
+		if(az != m_nodata && bz != m_nodata) {
+			return std::max(0.0, bz - az);
+		} else {
+			return std::numeric_limits<double>::infinity();
+		}
+	}
+};
+
+bool Flood::findSpillPoints(MemRaster& basinRaster) {
 	g_debug("Finding spill points.");
 
 	m_spillPoints.clear();
 
 	geo::util::Bounds bounds(0, 0, m_dem->props().cols(), m_dem->props().rows());
 
+	// A KDTree associated with each basin, containing the edge pixels.
 	std::unordered_map<int, KDTree<Cell> > trees;
+	// A set containing cells that have already been processed.
 	std::unordered_set<int> seen;
 
 	// Compare each basin to each other basin.
@@ -511,70 +552,162 @@ bool Flood::findSpillPoints(std::unique_ptr<MemRaster>& basinRaster, double elev
 			unsigned int id0 = b0.seedId();
 			unsigned int id1 = b1.seedId();
 
+			// Configure the KDTree associated with a basin, if has not already been done.
 			if(trees.find(id0) == trees.end()) {
 				trees.emplace(id0, 2);
 				KDTree<Cell>& q = trees[id0];
-				b0.computeEdges(*basinRaster, *m_dem, q);
+				b0.computeEdges(basinRaster, *m_dem, q);
 				q.build();
 			}
 			if(trees.find(id1) == trees.end()) {
 				trees.emplace(id1, 2);
 				KDTree<Cell>& q = trees[id1];
-				b1.computeEdges(*basinRaster, *m_dem, q);
+				b1.computeEdges(basinRaster, *m_dem, q);
 				q.build();
 			}
 
+			// The left-hand tree corresponds to the smaller basin.
 			int count0 = trees[id0].size();
 			int count1 = trees[id1].size();
-
-			// Compare the distances; save the ones that are near enough.
 			KDTree<Cell>& cells0 = count0 < count1 ? trees[id0] : trees[id1];
 			KDTree<Cell>& cells1 = count0 < count1 ? trees[id1] : trees[id0];
-			std::vector<Cell*> result;
-			std::vector<double> dist;
-			double spillDist = m_maxSpillDist / std::abs(basinRaster->props().resolutionX());
 
+			std::vector<Cell*> result;	// Contains the knn search resutls.
+			std::vector<double> dist;	// Contains the knn distance.
+			std::vector<size_t> path; 	// Contains the least-cost path.
+			std::list<double> dpath;	// Contains the path as x, y, z.
+
+			// A heuristic functor for the A* method.
+			AStarCost cost(m_dem, m_band);
+
+			// We ignore pixels that are greater than this distance apart.
+			double spillDist = m_maxSpillDist / std::abs(basinRaster.props().resolutionX());
+
+			// Iterate over the smaller list of edge cells.
 			for(const Cell* c0 : cells0.items()) {
 				if(Flood::cancel)
 					break;
+
+				// Remember that we've seen this one.
 				seen.insert(c0->cellId());
+
+				// Search for the nearest neighbour in the other tree.
 				cells1.knn(*c0, 1, std::back_inserter(result), std::back_inserter(dist));
+
+				// Look at each neighbour (there should only be one)
 				for(size_t i = 0; i < result.size(); ++i) {
-					std::cerr << dist[i] << "\n";
-					if(dist[i] <= spillDist) {
-						seen.insert(result[i]->cellId());
-						// Create a spill point; copies the cells.
-						m_spillPoints.emplace_back(*c0, *result[i], elevation);
+
+					// If the cells are too far away, skip.
+					if(dist[i] > spillDist)
+						continue;
+
+					const Cell* c1 = result[i];
+
+					// Perform the A* search.
+					bool success;
+					if((success = m_dem->searchAStar(c0->col(), c0->row(), c1->col(), c1->row(), cost, std::back_inserter(path), spillDist * 2))) {
+
+						// Iterate over the optimal path.
+						double minx, miny, minz = std::numeric_limits<double>::max();
+						for(size_t j = 0; j < path.size(); ++j) {
+
+							// Extract the column, row.
+							const size_t& p = path[j];
+							int c = (p >> 32) & 0xffffffff;
+							int r = p & 0xffffffff;
+
+							// If the index is not an endpoint and the line intersects a basin, this is not a valid connection.
+							int v;
+							if(j > 0 && j < path.size() - 1 && (v = basinRaster.getInt(c, r, 1)) > 0) {
+								success = false;
+								break;
+							}
+
+							// Extract the coordinates.
+							double x = m_dem->props().toCentroidX(c);
+							double y = m_dem->props().toCentroidY(r);
+							double z = m_dem->getFloat(c, r, m_band);
+							if(z < minz) {
+								minx = x;
+								miny = y;
+								minz = z;
+							}
+
+							// Create the path.
+							dpath.push_back(x);
+							dpath.push_back(y);
+							dpath.push_back(z);
+						}
+
+						// If the path is valid, record a spill point.
+						if(success) {
+							seen.insert(result[i]->cellId());
+							// Create a spill point; copies the cells.
+							m_spillPoints.emplace_back(*c0, *result[i], minx, miny, minz);
+							m_spillPoints[m_spillPoints.size() - 1].path.assign(dpath.begin(), dpath.end());
+						}
 					}
+
+					// Clear the paths for the next iteration.
+					dpath.clear();
+					path.clear();
+					dist.clear();
 				}
+
+				// Clear the results for the next search.
 				result.resize(0);
 				dist.resize(0);
 			}
 		}
 	}
 
-	//g_debug("Minimum distance: " << minDist);
 	return m_spillPoints.size();
 }
 
-void Flood::saveSpillPoints(unsigned int* id, std::ostream &out) {
+SPDB::SPDB(const std::string& file, const std::string& layer, const std::string& driver,
+		const std::unordered_map<std::string, FieldType>& fields,
+		GeomType type, int srid, bool replace) :
+				DB(file, layer, driver, fields, type, srid, replace) {}
+
+void SPDB::addSpillPoint(const SpillPoint& sp, const GridProps& props) {
+	const geo::flood::util::Cell& c1 = sp.cell1();
+	const geo::flood::util::Cell& c2 = sp.cell2();
+	double x1 = props.toCentroidX(c1.col());
+	double y1 = props.toCentroidY(c1.row());
+	double x2 = props.toCentroidX(c2.col());
+	double y2 = props.toCentroidY(c2.row());
+	double x3 = (x1 + x2) / 2.0;
+	double y3 = (y1 + y2) / 2.0;
+	double dist = std::sqrt(g_sq(x1 - x2) + g_sq(y1 - y2));
+
+	OGRFeature feat(m_fdef);
+	feat.SetField("id", (GIntBig) sp.id());
+	feat.SetField("id1", (GIntBig) c1.seedId());
+	feat.SetField("id2", (GIntBig) c2.seedId());
+	feat.SetField("x", sp.x());
+	feat.SetField("y", sp.y());
+	feat.SetField("elevation", sp.elevation());
+	feat.SetField("x1", x1);
+	feat.SetField("y1", y1);
+	feat.SetField("x2", x2);
+	feat.SetField("y2", y2);
+	feat.SetField("xmidpoint", x3);
+	feat.SetField("ymidpoint", y3);
+	feat.SetField("distance", dist);
+	OGRLineString geom;
+	for(size_t i = 0; i < sp.path.size(); i += 3)
+		geom.addPoint(sp.path[i], sp.path[i + 1], sp.path[i + 2]);
+	feat.SetGeometry(&geom);
+	if(OGRERR_NONE != m_layer->CreateFeature(&feat))
+		g_runerr("Failed to add feature to " << m_file << ".");
+}
+
+
+void Flood::saveSpillPoints(unsigned int* id, SPDB& db ) {
 	g_debug("Outputting spill points.");
-	out << std::setprecision(12);
 	const GridProps& props = m_dem->props();
-	for (const SpillPoint& sp : m_spillPoints) {
-		const Cell& c1 = sp.cell1();
-		const Cell& c2 = sp.cell2();
-		double x1 = props.toCentroidX(c1.col());
-		double y1 = props.toCentroidY(c1.row());
-		double x2 = props.toCentroidX(c2.col());
-		double y2 = props.toCentroidY(c2.row());
-		double x3 = (x1 + x2) / 2.0;
-		double y3 = (y1 + y2) / 2.0;
-		double dist = std::sqrt(g_sq(x1 - x2) + g_sq(y1 - y2));
-		out << ++(*id) << ", " << c1.seedId() << "," << x1 << "," << y1 << "," << c2.seedId() << ","
-				<< x2 << "," << y2 << "," << x3 << "," << y3 << ","
-				<< sp.elevation() << "," << dist << std::endl;
-	}
+	for (const SpillPoint& sp : m_spillPoints)
+		db.addSpillPoint(sp, props);
 }
 
 void Flood::findMinima() {
@@ -605,7 +738,7 @@ void Flood::findMinima() {
 	}
 }
 
-void Flood::worker(Flood* config, std::mutex* mtx, std::ofstream* ofs, std::queue<double>* elevations, bool mapped) {
+void Flood::worker(Flood* config, bool main, std::mutex* mtx, SPDB* db, std::queue<double>* elevations, bool mapped) {
 
 	Flood conf(*config);
 	conf.init(*mtx, mapped);
@@ -637,8 +770,6 @@ void Flood::worker(Flood* config, std::mutex* mtx, std::ofstream* ofs, std::queu
 
 		g_debug("Filling to " << elevation << " by step " << conf.step());
 
-		// Spill point ID. Needed?
-		unsigned int id = 0;
 		// To get the number of places.
 		double exp = std::pow(10, std::floor(-std::log10(conf.step())) + 1.0);
 
@@ -652,11 +783,9 @@ void Flood::worker(Flood* config, std::mutex* mtx, std::ofstream* ofs, std::queu
 		// Generate basins.
 		int basins = conf.fillBasins(basinRaster, elevation, mapped);
 
-		// Find and output spill points.
-		if (basins > 1 && !conf.spill().empty() && conf.findSpillPoints(basinRaster, elevation, mapped) > 0) {
-			std::lock_guard<std::mutex> lk(*mtx);
-			conf.saveSpillPoints(&id, *ofs);
-		}
+		conf.findSpillPoints(*basinRaster);
+		unsigned int id;
+		conf.saveSpillPoints(&id, *db);
 
 		g_debug("Writing basin raster " << rfile);
 
@@ -683,17 +812,29 @@ void Flood::flood(int numThreads, bool memMapped) {
 	g_debug("Flooding...");
 
 	std::list<std::thread> threads;
-	std::ofstream ofs;
 	std::queue<double> elevations;
 
 	// Build the config object.
 	Flood config(*this);
 	config.validateInputs();
 
+	std::unique_ptr<SPDB> db;
 	if(!config.spill().empty()) {
-		Util::rm(spill());
-		ofs.open(spill());
-		ofs << "id,id1,x1,y1,id2,x2,y2,xmidpoint,ymidpoint,elevation,distance" << std::endl;
+		std::unordered_map<std::string, FieldType> fields;
+		fields["id"] = FieldType::FTInt;
+		fields["id1"] = FieldType::FTInt;
+		fields["id2"] = FieldType::FTInt;
+		fields["x"] = FieldType::FTDouble;
+		fields["y"] = FieldType::FTDouble;
+		fields["x1"] = FieldType::FTDouble;
+		fields["y1"] = FieldType::FTDouble;
+		fields["x2"] = FieldType::FTDouble;
+		fields["y2"] = FieldType::FTDouble;
+		fields["xmidpoint"] = FieldType::FTDouble;
+		fields["ymidpoint"] = FieldType::FTDouble;
+		fields["elevation"] = FieldType::FTDouble;
+		fields["distance"] = FieldType::FTDouble;
+		db.reset(new SPDB(spill(), "spillpoints", "sqlite", fields, GeomType::GTLine, 0, true));
 	}
 
 	for(double e = start(); e <= end(); e += step())
@@ -702,9 +843,6 @@ void Flood::flood(int numThreads, bool memMapped) {
 	if(m_start == m_end && !m_outfile.empty()) {
 
 		g_debug("Filling to " << m_end);
-
-		// Spill point ID. Needed?
-		unsigned int id = 0;
 
 		std::mutex mtx;
 		config.init(mtx, memMapped);
@@ -724,9 +862,10 @@ void Flood::flood(int numThreads, bool memMapped) {
 		int basins = config.fillBasins(basinRaster, m_end, memMapped);
 
 		// Find and output spill points.
-		if (basins > 1 && !config.spill().empty() && config.findSpillPoints(basinRaster, m_end, memMapped) > 0) {
-			config.saveSpillPoints(&id, ofs);
-		}
+		config.findSpillPoints(*basinRaster);
+
+		unsigned int id;
+		config.saveSpillPoints(&id, *db);
 
 		const GridProps& props = basinRaster->props();
 		Raster bout(m_outfile, props);
@@ -742,7 +881,7 @@ void Flood::flood(int numThreads, bool memMapped) {
 	} else {
 		std::mutex mtx;
 		for(int i = 0; i < numThreads; ++i)
-			threads.emplace_back(Flood::worker, &config, &mtx, &ofs, &elevations, memMapped);
+			threads.emplace_back(Flood::worker, &config, i == 0, &mtx, db.get(), &elevations, memMapped);
 
 		for(std::thread& th : threads)
 			th.join();
