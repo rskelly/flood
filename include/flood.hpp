@@ -254,6 +254,14 @@ namespace geo {
 
 		using namespace flood::util;
 
+		class FloodCallbacks : public geo::util::Callbacks {
+		public:
+			void stepCallback(float status) const {}
+			void overallCallback(float status) const {}
+			void statusCallback(const std::string& msg) const {}
+	   };
+
+
 		class Flood {
 		private:
 			double m_start;
@@ -272,7 +280,11 @@ namespace geo {
 			std::string m_outfile;
 			std::vector<Cell> m_seeds;
 			std::vector<Basin> m_basinList;
-			std::vector<SpillPoint> m_spillPoints;
+
+			std::mutex m_mtxRast;
+			std::mutex m_mtxDb;
+			std::mutex m_mtxQueue;
+			std::mutex m_mtxTree;
 
 		public:
 			static bool cancel;
@@ -309,6 +321,12 @@ namespace geo {
 
 			~Flood();
 
+			std::mutex& mtxRast();
+
+			std::mutex& mtxDb();
+
+			std::mutex& mtxQueue();
+
 			const std::string& input() const;
 
 			const std::string& vdir() const;
@@ -342,10 +360,9 @@ namespace geo {
 			/**
 			 * Initialize the flood processor.
 			 *
-			 * @param mtx A mutex to protect resources.
 			 * @param mapped Set to true to use file-mapped memory.
 			 */
-			void init(std::mutex& mtx, bool mapped);
+			void init(bool mapped);
 
 			/**
 			 * Perform flood filling and identify basins.
@@ -355,13 +372,6 @@ namespace geo {
 			 * @return An int representing the number of basins created.
 			 */
 			int fillBasins(std::unique_ptr<MemRaster>& basinRaster, double elevation, bool mapped);
-
-			class FloodCallbacks : public geo::util::Callbacks {
-			public:
-				void stepCallback(float status) const {}
-				void overallCallback(float status) const {}
-				void statusCallback(const std::string& msg) const {}
-		   };
 
 			/**
 			 * Vectorize the given raster.
@@ -377,13 +387,13 @@ namespace geo {
 			 * @param elevation The flood elevation used to create the basins.
 			 * @return True on success.
 			 */
-			bool findSpillPoints(MemRaster& basinRaster, double elevation);
+			bool findSpillPoints(MemRaster& basinRaster, std::vector<SpillPoint>& spillPoints, double elevation);
 
 			/**
 			 * Output the spill points to a stream, with comma delimiters.
 			 * The fields are: ID1, x1, y1, ID2, x2, y2, midpoint x, midpoint y, distance
 			 */
-			void saveSpillPoints(unsigned int* id, SPDB& db);
+			void saveSpillPoints(unsigned int* id, std::vector<SpillPoint>& spillPoints, SPDB& db);
 
 			/**
 			 * Find the cells at the bottoms of depressions.
@@ -393,7 +403,7 @@ namespace geo {
 			/**
 			 * Called by flood, used by threads.
 			 */
-			static void worker(Flood* config, bool main, std::mutex* mtx, SPDB* ofs, std::queue<double>* elevations, bool mapped);
+			static void worker(Flood* config, SPDB* ofs, std::queue<double>* elevations, bool mapped);
 
 			/**
 			 * Start the flood process.
