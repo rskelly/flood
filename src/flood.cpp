@@ -539,7 +539,7 @@ public:
 		double az = m_dem->getFloat(ac, ar, m_band);
 		double bz = m_dem->getFloat(bc, br, m_band);
 		if(az != m_nodata && bz != m_nodata) {
-			return std::max(0.0, bz - az);
+			return std::max(0.0, (bz - az) / (std::pow((double) ac - bc, 2.0) + std::pow((double) ar - br, 2.0)));
 		} else {
 			return std::numeric_limits<double>::infinity();
 		}
@@ -637,7 +637,7 @@ bool Flood::findSpillPoints(MemRaster& basinRaster, std::vector<SpillPoint>& spi
 					if(success) {
 
 						// Iterate over the optimal path.
-						double minx, miny, minz = std::numeric_limits<double>::max();
+						double minx, miny, minz = std::numeric_limits<double>::lowest();
 						for(size_t j = 0; j < path.size(); ++j) {
 
 							// Extract the column, row.
@@ -660,7 +660,7 @@ bool Flood::findSpillPoints(MemRaster& basinRaster, std::vector<SpillPoint>& spi
 								std::lock_guard<std::mutex> lk(m_mtxRast);
 								z = m_dem->getFloat(c, r, m_band);
 							}
-							if(z < minz) {
+							if(z > minz) {
 								minx = x;
 								miny = y;
 								minz = z;
