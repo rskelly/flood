@@ -162,7 +162,6 @@ unsigned int Basin::seedId() const {
 	return m_id;
 }
 
-
 LEFillOperator::LEFillOperator(Grid* src, int srcBand, Grid* dst, int dstBand, double elevation, unsigned int id) :
 	m_src(src),
 	m_dst(dst),
@@ -175,8 +174,28 @@ LEFillOperator::LEFillOperator(Grid* src, int srcBand, Grid* dst, int dstBand, d
 	m_nodata = src->props().nodata();
 }
 
+void LEFillOperator::generateNoiseRaster(Grid& tpl, int tplBand, Grid& noise, double magnitude) {
+	// Set up random stuff.
+	std::uniform_real_distribution<double> dist(-magnitude / 2.0, magnitude / 2.0);
+	std::default_random_engine re(std::chrono::system_clock::now().time_since_epoch().count());
+
+	const GridProps& props = tpl.props();
+
+	// Generate and add noise.
+	double v;
+	for(int row = 0; row < props.rows(); ++row) {
+		for(int col = 0; col < props.cols(); ++col) {
+			if((v = tpl.getFloat(col, row, tplBand)) != props.nodata()) {
+				noise.setFloat(col, row, v + dist(re), 1);
+			} else {
+				noise.setFloat(col, row, v, 1);
+			}
+		}
+	}
+}
+
 bool LEFillOperator::shouldFill(int col, int row) const {
-	int fill = m_dst->getInt(col, row, m_srcBand);
+	int fill = m_dst->getInt(col, row, m_dstBand);
 	if(fill == m_nofill) {
 		double value = m_src->getFloat(col, row, m_srcBand);
 		return value != m_nodata && value <= m_elevation;
@@ -204,7 +223,8 @@ const GridProps& LEFillOperator::dstProps() const {
 	return m_dst->props();
 }
 
-LEFillOperator::~LEFillOperator(){}
+LEFillOperator::~LEFillOperator(){
+}
 
 
 size_t _spillPointId = 0;
@@ -259,13 +279,15 @@ using namespace geo::flood;
 Flood::Flood(const std::string& input, const std::string& vdir, const std::string& rdir,
 		const std::string& spill, const std::string& seeds, const std::string& outfile,
 		double start, double end, double step,
-		double minBasinArea, double maxSpillDist) :
+		double minBasinArea, double maxSpillDist, double noise, std::string noiseFile) :
 			m_start(start), m_end(end), m_step(step),
 			m_minBasinArea(minBasinArea),
 			m_maxSpillDist(maxSpillDist),
 			m_t(1),
 			m_band(1),
-			m_dem(nullptr),
+			m_dem(nullptr), 
+			m_noise(noise),
+			m_noiseFile(noiseFile),
 			m_input(input),
 			m_vdir(vdir),
 			m_rdir(rdir),
@@ -276,7 +298,7 @@ Flood::Flood(const std::string& input, const std::string& vdir, const std::strin
 
 Flood::Flood(const Flood& conf) :
 	Flood(conf.m_input, conf.m_vdir, conf.m_rdir, conf.m_spill, conf.m_fseeds, conf.m_outfile,
-		conf.m_start, conf.m_end, conf.m_step, conf.m_minBasinArea, conf.m_maxSpillDist) {
+		conf.m_start, conf.m_end, conf.m_step, conf.m_minBasinArea, conf.m_maxSpillDist, conf.m_noise) {
 	// Copy the thread count.
 	m_t = conf.m_t;
 }
@@ -438,14 +460,23 @@ void Flood::init(bool mapped) {
 
 	validateInputs();
 
-	g_debug("Initing...");
+	g_debug("Initing... (noise: " << m_noise << ")");
 	{
 		std::lock_guard<std::mutex> lk(m_mtxRast);
 		Raster tmp(m_input);
 		GridProps dp(tmp.props());
 		m_dem = new MemRaster(dp, mapped);
-		for(int r = 0; r < dp.rows(); ++r)
-			tmp.writeTo(*m_dem, dp.cols(), 1, 0, r, 0, r);
+		if(m_noise != 0.0) {
+			// Generate the noise raaster.
+			LEFillOperator::generateNoiseRaster(tmp, 1, *m_dem, m_noise);
+			// Output to a file.
+			Raster nr(m_noiseFile, m_dem->props());
+			for(int r = 0; r < dp.rows(); ++r)
+				m_dem->writeTo(nr, dp.cols(), 1, 0, r, 0, r);
+		} else {
+			for(int r = 0; r < dp.rows(); ++r)
+				tmp.writeTo(*m_dem, dp.cols(), 1, 0, r, 0, r);
+		}
 	}
 
 	g_debug("Computing stats...");

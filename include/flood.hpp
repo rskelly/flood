@@ -22,6 +22,7 @@
 #include <thread>
 #include <functional>
 #include <mutex>
+#include <random>
 
 #include "ds/kdtree.hpp"
 #include "raster.hpp"
@@ -168,8 +169,10 @@ namespace geo {
 
 			};
 
-			// A flood fill operator that fills pixels whose values are lower than
-			// the given elevation.
+			/**
+			 * A flood fill operator that fills pixels whose values are lower than
+			 * the given elevation.
+			 */
 			class LEFillOperator: public FillOperator<double, int> {
 			private:
 				Grid* m_src;
@@ -183,7 +186,19 @@ namespace geo {
 
 			public:
 
+				/**
+				 * Build the fill operator. 
+				 * 
+				 * @param src The source grid.
+				 * @param srcBand The source band.
+				 * @param dst The destination grid.
+				 * @param dstBand The destination band.
+				 * @param elevation The fill elevation.
+				 * @param id
+				 */
 				LEFillOperator(Grid* src, int srcBand, Grid* dst, int dstBand, double elevation, unsigned int id);
+
+				static void generateNoiseRaster(Grid& tpl, int tplBand, Grid& noise, double magnitude);
 
 				bool shouldFill(int col, int row) const;
 
@@ -272,6 +287,8 @@ namespace geo {
 			unsigned int m_t; // number of threads
 			unsigned int m_band;
 			MemRaster* m_dem;
+			double m_noise;
+			std::string m_noiseFile;
 			std::string m_input;
 			std::string m_vdir;
 			std::string m_rdir;
@@ -307,7 +324,7 @@ namespace geo {
 			Flood(const std::string& input, const std::string& vdir, const std::string& rdir,
 					const std::string& spill, const std::string& seeds, const std::string& outfile,
 					double start, double end, double step,
-					double minBasinArea, double maxSpillDist);
+					double minBasinArea, double maxSpillDist, double noise = 0.0, std::string noiseFile = "");
 
 			/**
 			 * Copy the given Flood object.

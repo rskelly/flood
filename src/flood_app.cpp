@@ -49,7 +49,8 @@ void usage() {
 			<< " -t     Number of threads to use. Default 1.\n"
 			<< " -b     Minimum basin area.\n"
 			<< " -d     Maximum spill distance.\n"
-			<< " -m     Use file-backed memory for intermediate rasters.";
+			<< " -m     Use file-backed memory for intermediate rasters.\n"
+			<< " -n <n> <f> Add the given amount of noise to the elevations. Writes the file to the given name.\n";
 }
 
 int main(int argc, char **argv) {
@@ -71,19 +72,21 @@ int main(int argc, char **argv) {
 	double minBasinArea = 100.0;
 	int t = 1;
 	bool mapped = false;
+	double noise = 0.0;
+	std::string noiseFile;
 
 	for (int i = 1; i < argc; ++i) {
 		std::string a(argv[i]);
 		if (a == "-i") {
-			input.assign(argv[++i]);
+			input = argv[++i];
 		} else if (a == "-m") {
 			mapped = true;
 		} else if (a == "-s") {
-			seeds.assign(argv[++i]);
+			seeds = argv[++i];
 		} else if (a == "-v") {
-			vdir.assign(argv[++i]);
+			vdir = argv[++i];
 		} else if (a == "-r") {
-			rdir.assign(argv[++i]);
+			rdir = argv[++i];
 		} else if (a == "-p") {
 			spill = argv[++i];
 		} else if (a == "-o") {
@@ -91,7 +94,7 @@ int main(int argc, char **argv) {
 		} else if (a == "-h") {
 			height = atof(argv[++i]);
 			hasHeight = true;
-			spill.assign(argv[++i]);
+			spill = argv[++i];
 		} else if (a == "-start") {
 			start = atof(argv[++i]);
 		} else if (a == "-end") {
@@ -104,6 +107,9 @@ int main(int argc, char **argv) {
 			minBasinArea = atof(argv[++i]);
 		} else if (a == "-d") {
 			maxSpillDist = atof(argv[++i]);
+		} else if (a == "-n") {
+			noise = atof(argv[++i]);
+			noiseFile = argv[++i];
 		}
 	}
 
@@ -118,7 +124,7 @@ int main(int argc, char **argv) {
 		}
 
 		geo::flood::Flood config(input, vdir, rdir, spill, seeds, outfile, start, end,
-				step, minBasinArea, maxSpillDist);
+				step, minBasinArea, maxSpillDist, noise, noiseFile);
 		config.flood(t, mapped);
 
 	} catch (const std::exception &e) {
