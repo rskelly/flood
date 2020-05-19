@@ -23,11 +23,11 @@
 #include <functional>
 #include <mutex>
 
-#include "ds/kdtree.hpp"
-#include "raster.hpp"
+#include "ds/mqtree.hpp"
+#include "grid.hpp"
 #include "geo.hpp"
 
-using namespace geo::raster;
+using namespace geo::grid;
 using namespace geo::ds;
 
 namespace geo {
@@ -35,13 +35,6 @@ namespace geo {
 	namespace flood {
 
 		namespace util {
-
-			/**
-			 * Reads a line from a CSV stream into a vector of values.
-			 * @param st The input stream.
-			 * @param row The list to append rows to.
-			 */
-			bool readline(std::istream &st, std::vector<std::string> &row);
 
 			/**
 			 * Represents a grid cell.
@@ -64,39 +57,39 @@ namespace geo {
 
 				/**
 				 * Construct a new cell with the grid coordinates and an automatic ID.
-				 * @param col The column.
-				 * @param row The row.
+				 * \param col The column.
+				 * \param row The row.
 				 */
 				Cell(size_t seedId, int col, int row);
 
 				/**
 				 * Construct a new cell with the grid coordinates and an explicit ID.
-				 * @param id The ID.
-				 * @param col The column.
-				 * @param row The row.
+				 * \param id The ID.
+				 * \param col The column.
+				 * \param row The row.
 				 */
 				Cell(size_t id, size_t seedId, int col, int row);
 
 				/**
 				 * Construct a new cell with the grid coordinates and an explicit ID and value.
-				 * @param id The ID.
-				 * @param col The column.
-				 * @param row The row.
-				 * @param value The value.
+				 * \param id The ID.
+				 * \param col The column.
+				 * \param row The row.
+				 * \param value The value.
 				 */
 				Cell(size_t id, size_t seedId, int col, int row, double value);
 
 				/**
 				 * Construct a new cell with the grid coordinates and an automatic ID and explicit value.
-				 * @param col The column.
-				 * @param row The row.
-				 * @param value The value.
+				 * \param col The column.
+				 * \param row The row.
+				 * \param value The value.
 				 */
 				Cell(size_t seedId, int col, int row, double value);
 
 				/**
 				 * Return the coordinate by axis index.
-				 * @param idx The index
+				 * \param idx The index
 				 */
 				double operator[](int idx) const;
 
@@ -137,12 +130,12 @@ namespace geo {
 				/**
 				 * Construct a basin with the given seed ID, extent and area.
 				 *
-				 * @param seedId The seed ID.
-				 * @param minc The minimum column index.
-				 * @param minr The minimum row index.
-				 * @param maxc The maximum column index.
-				 * @param maxr The maximum row index.
-				 * @param area The basin area.
+				 * \param seedId The seed ID.
+				 * \param minc The minimum column index.
+				 * \param minr The minimum row index.
+				 * \param maxc The maximum column index.
+				 * \param maxr The maximum row index.
+				 * \param area The basin area.
 				 */
 				Basin(unsigned int seedId, int minc, int minr, int maxc, int maxr, int area);
 
@@ -150,12 +143,11 @@ namespace geo {
 				 * Make a list of all the cells that are on the edges of this basin and are
 				 * also a local minimum.
 				 *
-				 * @param grd The flood fill grid.
-				 * @param dem The original elevation raster.
-				 * @param edgeCells A KDTree to insert the cells into.
+				 * \param grd The flood fill grid.
+				 * \param edgeCells A ,mqtree to insert the cells into.
 				 * @return The number of cells found.
 				 */
-				int computeEdges(Grid& grd, Grid& dem, KDTree<Cell>& edgeCells);
+				int computeEdges(Band<int>& grd, mqtree<Cell>& edgeCells);
 
 				/**
 				 * Return the basins seed ID.
@@ -168,10 +160,10 @@ namespace geo {
 
 			// A flood fill operator that fills pixels whose values are lower than
 			// the given elevation.
-			class LEFillOperator: public FillOperator<double, int> {
+			class LEFillOperator: public FillOperator<float, int> {
 			private:
-				Grid* m_src;
-				Grid* m_dst;
+				Band<float>* m_src;
+				Band<int>* m_dst;
 				double m_elevation;
 				double m_nodata;
 				unsigned int m_id;
@@ -181,7 +173,7 @@ namespace geo {
 
 			public:
 
-				LEFillOperator(Grid* src, int srcBand, Grid* dst, int dstBand, double elevation, unsigned int id);
+				LEFillOperator(Band<float>* src, int srcBand, Band<int>* dst, int dstBand, double elevation, unsigned int id);
 
 				bool shouldFill(int col, int row) const;
 
@@ -231,6 +223,79 @@ namespace geo {
 
 		using namespace flood::util;
 
+		class Output {
+		public:
+			std::string rdir;
+			virtual bool valid() const { return false; }
+			virtual void prepare() const {};
+			virtual bool doVectors() const { return false; }
+			virtual void saveVector(Band<int>& basins, float elevation) const {}
+			std::string rasterFile(float elevation) const {
+				std::stringstream ss;
+				ss << rdir << "/" << (int) (elevation * 10000) << ".tif";
+				return ss.str();
+			}
+			virtual ~Output() {}
+		};
+
+		class DBOutput : public Output {
+		public:
+			std::string conn;
+			std::string layer;
+			std::string id;
+			std::string elevation;
+			bool valid() const {
+				return !rdir.empty() && !conn.empty() && !layer.empty() && !id.empty() && !elevation.empty();
+			}
+			void prepare() const {
+				if(!rdir.empty() && !isdir(rdir))
+					makedir(rdir);
+				if(!isdir(rdir))
+					throw std::runtime_error("Raster output directory does not exist and could not be created.");
+			}
+			bool doVectors() const { return true; }
+			void saveVector(Band<int>& rast, float elev) const {
+				std::vector<PolygonValue> fields = {{elevation, elev}};
+				rast.polygonizeToTable(conn, layer, id, fields);
+			}
+		};
+
+		class FileOutput : public Output {
+		public:
+			std::string vdir;
+			bool valid() const {
+				return !rdir.empty();
+			}
+			void prepare() const {
+				if(!vdir.empty() && !isdir(vdir))
+					makedir(vdir);
+				if(!vdir.empty() && !isdir(vdir))
+					throw std::runtime_error("Vector output directory does not exist and could not be created.");
+				if(!rdir.empty() && !isdir(rdir))
+					makedir(rdir);
+				if(!isdir(rdir))
+					throw std::runtime_error("Raster output directory does not exist and could not be created.");
+			}
+			bool doVectors() const { return !vdir.empty(); }
+			void saveVector(Band<int>& rast, float elevation) const {
+				std::stringstream ss;
+				ss << vdir << "/" << (int) (elevation * 10000) << ".sqlite";
+				std::string vfile = ss.str();
+				rast.polygonizeToFile(vfile, "basins", "bid", "SQLite");
+			}
+		};
+
+		class BreakLine {
+		public:
+			double x0;
+			double y0;
+			double x1;
+			double y1;
+			float value;
+			BreakLine(double x0, double y0, double x1, double y1, float value) :
+				x0(x0), y0(y0), x1(x1), y1(y1), value(value) {}
+		};
+
 		class Flood {
 		private:
 			double m_start;
@@ -240,16 +305,15 @@ namespace geo {
 			double m_maxSpillDist;
 			unsigned int m_t; // number of threads
 			unsigned int m_band;
-			MemRaster* m_dem;
+			Band<float> m_dem;
+			const Output* m_output;
 			std::string m_input;
-			std::string m_vdir;
-			std::string m_rdir;
 			std::string m_spill;
 			std::string m_fseeds;
-			std::string m_outfile;
 			std::vector<Cell> m_seeds;
 			std::vector<Basin> m_basinList;
 			std::vector<SpillPoint> m_spillPoints;
+			std::vector<BreakLine> m_breakLines;
 
 		public:
 			static bool cancel;
@@ -257,22 +321,23 @@ namespace geo {
 			/**
 			 * Create a Flood object.
 			 *
-			 * @param input The DEM file.
-			 * @param vdir The vector output directory. If not given, no vectors are produced.
-			 * @param rdir The raster output directory.
-			 * @param spill The spill points file. CSV or SHP.
-			 * @param seeds The seeds file. CSV.
-			 * @param outfile If the height flag was specified, the output file can be used to direct the single output file.
-			 * @param start The starting elevation.
-			 * @param end The ending elevation.
-			 * @param step The step elevation.
-			 * @param minBasinArea The minimum area of a region to be considered a basing for connectivity purposes.
-			 * @param maxSpillDist The maximum distance between two basins before they are suspected of connecting.
+			 * \param input The DEM file.
+			 * \param band Input raster band.
+			 * \param output Configuration for file/DB/etc. output.
+			 * \param spill The spill points file. CSV or SHP.
+			 * \param seeds The seeds file. CSV.
+			 * \param start The starting elevation.
+			 * \param end The ending elevation.
+			 * \param step The step elevation.
+			 * \param minBasinArea The minimum area of a region to be considered a basing for connectivity purposes.
+			 * \param maxSpillDist The maximum distance between two basins before they are suspected of connecting.
+			 * \param breakLines A list of breaklines to apply to the input raster.
 			 */
-			Flood(const std::string& input, const std::string& vdir, const std::string& rdir,
-					const std::string& spill, const std::string& seeds, const std::string& outfile,
+			Flood(const std::string& input, int band, const Output& output,
+					const std::string& spill, const std::string& seeds,
 					double start, double end, double step,
-					double minBasinArea, double maxSpillDist);
+					double minBasinArea, double maxSpillDist,
+					const std::vector<BreakLine>& breakLines);
 
 			/**
 			 * Copy the given Flood object.
@@ -288,7 +353,7 @@ namespace geo {
 
 			const std::string& input() const;
 
-			const std::string& vdir() const;
+			const Output& output() const;
 
 			const std::string& rdir() const;
 
@@ -314,40 +379,25 @@ namespace geo {
 
 			const std::vector<Cell>& seeds() const;
 
-			MemRaster* dem() const;
+			Band<float>& dem();
 
 			/**
 			 * Initialize the flood processor.
 			 *
-			 * @param mtx A mutex to protect resources.
-			 * @param mapped Set to true to use file-mapped memory.
+			 * \param mtx A mutex to protect resources.
 			 */
-			void init(std::mutex& mtx, bool mapped);
+			void init(std::mutex& mtx);
 
 			/**
 			 * Perform flood filling and identify basins.
-			 * @param basinRaster An empty unique_ptr to contain a MemRaster.
-			 * @param elevation The elevation to fill to.
-			 * @param mapped Set to true to used mapped memory. Slow.
+			 * \param basinRaster An empty unique_ptr to contain a Band<float>.
+			 * \param elevation The elevation to fill to.
+			 * \param mapped Set to true to used mapped memory. Slow.
 			 * @return An int representing the number of basins created.
 			 */
-			int fillBasins(std::unique_ptr<MemRaster>& basinRaster, double elevation, bool mapped);
+			int fillBasins(Band<int>& basinRaster, double elevation);
 
-			class FloodCallbacks : public geo::util::Callbacks {
-			public:
-				void stepCallback(float status) const {}
-				void overallCallback(float status) const {}
-				void statusCallback(const std::string& msg) const {}
-		   };
-
-			/**
-			 * Vectorize the given raster.
-			 * @param rfile the raster file.
-			 * @param vfile the vector file.
-			 */
-			void saveBasinVector(const std::string& rfile, const std::string& vfile);
-
-			bool findSpillPoints(std::unique_ptr<MemRaster>& basinRaster, double elevation, bool mapped);
+			bool findSpillPoints(Band<int>& basinRaster, double elevation);
 
 			/**
 			 * Output the spill points to a stream, with comma delimiters.
@@ -363,15 +413,14 @@ namespace geo {
 			/**
 			 * Called by flood, used by threads.
 			 */
-			static void worker(Flood* config, std::mutex* mtx, std::ofstream* ofs, std::queue<double>* elevations, bool mapped);
+			static void worker(Flood* config, std::mutex* mtx, std::ofstream* ofs, std::queue<double>* elevations);
 
 			/**
 			 * Start the flood process.
 			 *
-			 * @param numThreads The number of threads to run.
-			 * @param memMapped Set to true to use a file-backed temporary raster.
+			 * \param numThreads The number of threads to run.
 			 */
-			void flood(int numThreads, bool memMapped);
+			void flood(int numThreads);
 
 		};
 

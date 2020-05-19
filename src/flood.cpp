@@ -5,73 +5,84 @@
  *      Author: rob
  */
 
+#include <cmath>
+
+#include "ds/mqtree.hpp"
+#include "grid.hpp"
+#include "util.hpp"
+
 #include "flood.hpp"
 
 using namespace geo::flood::util;
+using namespace geo::grid;
+using namespace geo::ds;
+using namespace geo::util;
 
+namespace {
+	/**
+	 * Maintains the IDs for cells in the raster.
+	 */
+	size_t cellId = 0;
+	std::mutex cellMtx;
 
-/**
- * Maintains the IDs for cells in the raster.
- */
-static size_t _cellId = 0;
-static std::mutex _cellMtx;
-
-static size_t _nextCellId() {
-	std::lock_guard<std::mutex> lk(_cellMtx);
-	return ++_cellId;
-}
-
-
-bool geo::flood::util::readline(std::istream &st, std::vector<std::string> &row) {
-	row.clear();
-	std::string line;
-	std::getline(st, line);
-	std::stringstream linest(line);
-	std::string cell;
-	bool data = false;
-	while (std::getline(linest, cell, ',')) {
-		row.push_back(cell);
-		data = true;
+	size_t nextCellId() {
+		std::lock_guard<std::mutex> lk(cellMtx);
+		return ++cellId;
 	}
-	return data;
-}
 
-geo::flood::util::Cell::Cell() :
+
+	bool readline(std::istream &st, std::vector<std::string> &row) {
+		row.clear();
+		std::string line;
+		std::getline(st, line);
+		std::stringstream linest(line);
+		std::string cell;
+		bool data = false;
+		while (std::getline(linest, cell, ',')) {
+			row.push_back(cell);
+			data = true;
+		}
+		return data;
+	}
+
+} // anon
+
+geo::flood::Cell::Cell() :
 	m_col(0), m_row(0),
-	m_cellId(_nextCellId()),
+	m_cellId(nextCellId()),
 	m_value(0),
 	m_seedId(0) {
 }
 
-geo::flood::util::Cell::Cell(size_t seedId, int col, int row) :
+geo::flood::Cell::Cell(size_t seedId, int col, int row) :
 	m_col(col), m_row(row),
-	m_cellId(++_cellId),
+	m_cellId(nextCellId()),
 	m_value(0),
 	m_seedId(seedId) {
 }
 
-geo::flood::util::Cell::Cell(size_t id, size_t seedId, int col, int row) :
+geo::flood::Cell::Cell(size_t id, size_t seedId, int col, int row) :
 	m_col(col), m_row(row),
 	m_cellId(id),
 	m_value(0),
 	m_seedId(seedId) {
 }
 
-geo::flood::util::Cell::Cell(size_t id, size_t seedId, int col, int row, double value) :
+geo::flood::Cell::Cell(size_t id, size_t seedId, int col, int row, double value) :
 	m_col(col), m_row(row),
 	m_cellId(id),
 	m_value(value),
 	m_seedId(seedId) {
 }
 
-geo::flood::util::Cell::Cell(size_t seedId, int col, int row, double value) :
+geo::flood::Cell::Cell(size_t seedId, int col, int row, double value) :
 	m_col(col), m_row(row),
-	m_cellId(++_cellId),
+	m_cellId(nextCellId()),
 	m_value(value),
 	m_seedId(seedId) {
 }
 
-double geo::flood::util::Cell::operator[](int idx) const {
+double geo::flood::Cell::operator[](int idx) const {
 	switch(idx % 2) {
 	case 0: return m_col;
 	case 1: return m_row;
@@ -79,40 +90,40 @@ double geo::flood::util::Cell::operator[](int idx) const {
 	return 0;
 }
 
-double geo::flood::util::Cell::x() const {
+double geo::flood::Cell::x() const {
 	return m_col;
 }
 
-double geo::flood::util::Cell::y() const {
+double geo::flood::Cell::y() const {
 	return m_row;
 }
 
-int geo::flood::util::Cell::row() const {
+int geo::flood::Cell::row() const {
 	return m_row;
 }
 
-int geo::flood::util::Cell::col() const {
+int geo::flood::Cell::col() const {
 	return m_col;
 }
 
-size_t geo::flood::util::Cell::cellId() const {
+size_t geo::flood::Cell::cellId() const {
 	return m_cellId;
 }
 
-size_t geo::flood::util::Cell::seedId() const {
+size_t geo::flood::Cell::seedId() const {
 	return m_seedId;
 }
 
-double geo::flood::util::Cell::value() const {
+double geo::flood::Cell::value() const {
 	return m_value;
 }
 
-double geo::flood::util::Cell::distance(const Cell& other, double resx, double resy) const {
+double geo::flood::Cell::distance(const Cell& other, double resx, double resy) const {
 	double x0 = col() * resx;
 	double y0 = row() * resy;
 	double x1 = other.col() * resx;
 	double y1 = other.row() * resy;
-	return std::sqrt(g_sq(x0 - x1) + g_sq(y0 - y1));
+	return std::sqrt(geo::sq(x0 - x1) + geo::sq(y0 - y1));
 }
 
 
@@ -125,7 +136,7 @@ Basin::Basin(unsigned int id, int minc, int minr, int maxc, int maxr, int area) 
 	m_band(1) {
 }
 
-int Basin::computeEdges(Grid& grd, Grid& dem, KDTree<Cell>& edgeCells) {
+int Basin::computeEdges(Band<int>& grd, mqtree<Cell>& edgeCells) {
 	// Offsets for searching. {row, col}
 	static int offset[4][2] = {{-1, 0}, {0, -1}, {0, 1}, {1, 0}};
 	// Get the grid dimensions.
@@ -139,14 +150,14 @@ int Basin::computeEdges(Grid& grd, Grid& dem, KDTree<Cell>& edgeCells) {
 	for (int r = m_minr; r <= m_maxr; ++r) {
 		for (int c = m_minc; c <= m_maxc; ++c) {
 			// Only look at pixels that match the seed ID.
-			if ((unsigned int) grd.getInt(c, r, m_band) == m_id) {
+			if ((unsigned int) grd.get(c, r) == m_id) {
 				for (int i = 0; i < 4; ++i) {
 					int co = c + offset[i][1];
 					int ro = r + offset[i][0];
 					// Check if this is an edge pixel.
-					if(co < 0 || ro < 0 || co >= cols || ro >= rows || (unsigned int) grd.getInt(co, ro, m_band) != m_id) {
-						edgeCells.add(new Cell(m_id, c, r));
-						out << props.toCentroidX(c) << "," << props.toCentroidY(r) << "\n";
+					if(co < 0 || ro < 0 || co >= cols || ro >= rows || (unsigned int) grd.get(co, ro) != m_id) {
+						edgeCells.add(Cell(m_id, c, r));
+						out << props.toX(c) << "," << props.toY(r) << "\n";
 						++count;
 						break;
 					}
@@ -162,7 +173,7 @@ unsigned int Basin::seedId() const {
 }
 
 
-LEFillOperator::LEFillOperator(Grid* src, int srcBand, Grid* dst, int dstBand, double elevation, unsigned int id) :
+LEFillOperator::LEFillOperator(Band<float>* src, int srcBand, Band<int>* dst, int dstBand, double elevation, unsigned int id) :
 	m_src(src),
 	m_dst(dst),
 	m_elevation(elevation),
@@ -175,16 +186,19 @@ LEFillOperator::LEFillOperator(Grid* src, int srcBand, Grid* dst, int dstBand, d
 }
 
 bool LEFillOperator::shouldFill(int col, int row) const {
-	int fill = m_dst->getInt(col, row, m_srcBand);
+	if(!m_dst->props().hasCell(col, row))
+		return false;
+	int fill = m_dst->get(col, row);
 	if(fill == m_nofill) {
-		double value = m_src->getFloat(col, row, m_srcBand);
+		double value = m_src->get(col, row);
 		return value != m_nodata && value <= m_elevation;
 	}
 	return false;
 }
 
 void LEFillOperator::fill(int col, int row) const {
-	m_dst->setInt(col, row, (int) m_id, m_dstBand);
+	if(m_dst->props().hasCell(col, row))
+		m_dst->set(col, row, (int) m_id);
 }
 
 void LEFillOperator::setFill(unsigned int fill) {
@@ -213,11 +227,11 @@ SpillPoint::SpillPoint(const Cell& c1, const Cell& c2, double elevation) :
 		m_elevation(elevation) {
 }
 
-const geo::flood::util::Cell& SpillPoint::cell1() const {
+const geo::flood::Cell& SpillPoint::cell1() const {
 	return m_c1;
 }
 
-const geo::flood::util::Cell& SpillPoint::cell2() const {
+const geo::flood::Cell& SpillPoint::cell2() const {
 	return m_c2;
 }
 
@@ -236,27 +250,27 @@ SpillPoint::~SpillPoint() {
 
 using namespace geo::flood;
 
-Flood::Flood(const std::string& input, const std::string& vdir, const std::string& rdir,
-		const std::string& spill, const std::string& seeds, const std::string& outfile,
+Flood::Flood(const std::string& input, int band, const Output& output,
+		const std::string& spill, const std::string& seeds,
 		double start, double end, double step,
-		double minBasinArea, double maxSpillDist) :
+		double minBasinArea, double maxSpillDist,
+		const std::vector<BreakLine>& breakLines) :
 			m_start(start), m_end(end), m_step(step),
 			m_minBasinArea(minBasinArea),
 			m_maxSpillDist(maxSpillDist),
 			m_t(1),
-			m_band(1),
-			m_dem(nullptr),
+			m_band(band),
+			m_output(&output),
 			m_input(input),
-			m_vdir(vdir),
-			m_rdir(rdir),
 			m_spill(spill),
-			m_fseeds(seeds),
-			m_outfile(outfile) {
+			m_fseeds(seeds) {
+	m_breakLines = breakLines;
 }
 
 Flood::Flood(const Flood& conf) :
-	Flood(conf.m_input, conf.m_vdir, conf.m_rdir, conf.m_spill, conf.m_fseeds, conf.m_outfile,
-		conf.m_start, conf.m_end, conf.m_step, conf.m_minBasinArea, conf.m_maxSpillDist) {
+	Flood(conf.m_input, conf.m_band, *conf.m_output, conf.m_spill, conf.m_fseeds,
+		conf.m_start, conf.m_end, conf.m_step, conf.m_minBasinArea, conf.m_maxSpillDist,
+		conf.m_breakLines) {
 	// Copy the thread count.
 	m_t = conf.m_t;
 }
@@ -271,26 +285,23 @@ void Flood::validateInputs() {
 	if(m_step <= 0)
 		throw std::runtime_error("Step must be greater than zero.");
 
-	if(m_start != m_end && !m_outfile.empty())
-		throw std::runtime_error("The output file is specified, but there will be more than one output. This is not allowed.");
-
 	if(m_minBasinArea < 0)
 		throw std::runtime_error("Minimum basin area must be greater than or equal to zero.");
 
 	if(m_maxSpillDist <= 0)
 		throw std::runtime_error("Maximum spill distance must be larger than zero.");
 
-	if (m_vdir.empty())
-		g_debug("WARNING: No vector directory; not producing flood vectors.");
+	if (!m_output || m_output->valid())
+		g_warn("The output configuration is not valid.");
 
 	if (m_spill.empty())
-		g_debug("WARNING: No spill file; not producing spill points.");
+		g_warn("No spill file; not producing spill points.");
 
 	if (std::isnan(m_start))
-		g_debug("WARNING: Start value not given; using raster minimum.");
+		g_warn("Start value not given; using raster minimum.");
 
 	if (std::isnan(m_end))
-		g_debug("WARNING: End value not given; using raster maximum.");
+		g_warn("End value not given; using raster maximum.");
 
 	unsigned int threads = std::thread::hardware_concurrency();
 	if(m_t < 1)
@@ -302,51 +313,25 @@ void Flood::validateInputs() {
 	if(m_input.empty())
 		throw std::runtime_error("Input raster not given.");
 
-	if(!Util::exists(m_input))
+	if(!isfile(m_input))
 		throw std::runtime_error("Input raster not found.");
 
-	if(!m_vdir.empty() && !Util::exists(m_vdir))
-		Util::mkdir(m_vdir);
+	if(!m_fseeds.empty() && !isfile(m_fseeds))
+		throw std::runtime_error("Seeds file does not exist.");
 
-	if(!m_vdir.empty() && !Util::exists(m_vdir))
-		throw std::runtime_error("Vector output directory does not exist and could not be created.");
-
-	if(m_outfile.empty() && m_rdir.empty())
-		throw std::runtime_error("Raster output directory not given.");
-
-	if(!m_outfile.empty()) {
-		std::string dir = Util::parent(m_outfile);
-		if(!Util::exists(dir))
-			Util::mkdir(dir);
-		if(!Util::exists(dir))
-			throw std::runtime_error("Failed to create directory for output file.");
-	}
-
-	if(!m_rdir.empty()) {
-		if(!Util::exists(m_rdir))
-			Util::mkdir(m_rdir);
-		if(!Util::exists(m_rdir))
-			throw std::runtime_error("Raster output directory does not exist and could not be created.");
-	}
-
-	if(!Util::exists(m_fseeds))
-		throw std::runtime_error("Seeds file does not exists.");
+	m_output->prepare();
 }
 
 Flood::~Flood() {
-	delete m_dem;
+
 }
 
 const std::string& Flood::input() const {
 	return m_input;
 }
 
-const std::string& Flood::vdir() const {
-	return m_vdir;
-}
-
-const std::string& Flood::rdir() const {
-	return m_rdir;
+const Output& Flood::output() const {
+	return *m_output;
 }
 
 const std::string& Flood::spill() const {
@@ -383,9 +368,9 @@ void Flood::loadSeeds(bool header) {
 	std::ifstream csv(m_fseeds);
 	std::vector<std::string> row;
 	if (header)
-		geo::flood::util::readline(csv, row);
-	const GridProps &props = m_dem->props();
-	while (geo::flood::util::readline(csv, row)) {
+		readline(csv, row);
+	const GridProps &props = m_dem.props();
+	while (readline(csv, row)) {
 		unsigned int id = (unsigned int) std::strtol(row[0].c_str(), nullptr, 10);
 		double x = std::strtod(row[1].c_str(), nullptr);
 		double y = std::strtod(row[2].c_str(), nullptr);
@@ -394,61 +379,53 @@ void Flood::loadSeeds(bool header) {
 	}
 }
 
-const std::vector<geo::flood::util::Cell>& Flood::seeds() const {
+const std::vector<geo::flood::Cell>& Flood::seeds() const {
 	return m_seeds;
 }
 
-MemRaster* Flood::dem() const {
+Band<float>& Flood::dem() {
 	return m_dem;
 }
 
-void Flood::init(std::mutex& mtx, bool mapped) {
+void Flood::init(std::mutex& mtx) {
 
 	validateInputs();
 
 	g_debug("Initing...");
 	{
 		std::lock_guard<std::mutex> lk(mtx);
-		Raster tmp(m_input);
-		GridProps dp(tmp.props());
-		m_dem = new MemRaster(dp, mapped);
-		for(int r = 0; r < dp.rows(); ++r)
-			tmp.writeTo(*m_dem, dp.cols(), 1, 0, r, 0, r);
+		m_dem.init(m_input, m_band - 1, false, true);
+		if(!m_breakLines.empty()) {
+			for(const BreakLine& l : m_breakLines)
+				m_dem.drawLine(l.x0, l.y0, l.x1, l.y1, l.value);
+		}
 	}
 
 	g_debug("Computing stats...");
-	const GridStats stats = m_dem->stats(1);
+	const GridStats stats = m_dem.stats();
 	if (std::isnan(m_start)) {
 		m_start = stats.min;
 	} else {
-		m_start = g_max(stats.min, m_start);
+		m_start = geo::max(stats.min, m_start);
 	}
 	if (std::isnan(m_end)) {
 		m_end = stats.max;
 	} else {
-		m_end = g_min(stats.max, m_end);
+		m_end = geo::min(stats.max, m_end);
 	}
 	g_debug("Stats: " << stats.min << ", " << stats.max);
 	if (m_end < m_start)
 		g_argerr("The ending elevation must be larger than the starting elevation: " << m_start << ", " << m_end);
 }
 
-int Flood::fillBasins(std::unique_ptr<MemRaster>& basinRaster, double elevation, bool mapped) {
+int Flood::fillBasins(Band<int>& basinRaster, double elevation) {
 	g_debug("Filling basins: " << elevation);
 
-	// Set up the output raster.
-	GridProps props(m_dem->props());
-	props.setBands(1);
-	props.setNoData(0);
-	props.setDataType(DataType::UInt32);
-	props.setWritable(true);
-	props.setCompress(true);
-	basinRaster.reset(new MemRaster(props, mapped));
-	basinRaster->fillInt(0, m_band);
+	basinRaster.fill(0);
 	m_basinList.clear();
 
 	// Set up the fill operator.
-	LEFillOperator op(m_dem, 1, basinRaster.get(), 1, elevation, 0);
+	LEFillOperator op(&m_dem, 1, &basinRaster, 1, elevation, 0);
 	op.setNoFill(0);
 
 	// Iterate over the seeds.
@@ -457,7 +434,7 @@ int Flood::fillBasins(std::unique_ptr<MemRaster>& basinRaster, double elevation,
 		if(Flood::cancel)
 			break;
 
-		if (!props.hasCell(seed.col(), seed.row())) {
+		if (!basinRaster.props().hasCell(seed.col(), seed.row())) {
 			g_warn("Found a seed out of bounds: " << seed.col() << ", " << seed.row());
 			continue;
 		}
@@ -465,17 +442,19 @@ int Flood::fillBasins(std::unique_ptr<MemRaster>& basinRaster, double elevation,
 		// Fill the basin based on the elevations in the DEM.
 		int minc, minr, maxc, maxr, area;
 		op.setFill(seed.cellId());
-		Grid::floodFill(seed.col(), seed.row(), op, false, &minc, &minr, &maxc, &maxr, &area);
+		Band<float>::floodFill(seed.col(), seed.row(), op, true, &minc, &minr, &maxc, &maxr, &area);
 
-		if (area >= minBasinArea()) {
+		double barea = area * std::abs(m_dem.props().resX() * m_dem.props().resY());
+
+		if (barea >= minBasinArea()) {
 			// If it's large enough, save the basin.
-			g_debug("Good Seed: " << seed.col() << ", " << seed.row() << "; elevation: " << elevation << "; basin area: " << area);
+			g_debug("Good Seed: " << seed.col() << ", " << seed.row() << "; elevation: " << elevation << "; basin area: " << barea);
 			m_basinList.emplace_back(seed.cellId(), minc, minr, maxc, maxr, area);
 		} else if(area > 0){
-			g_debug("Bad Seed: " << seed.col() << ", " << seed.row() << "; elevation: " << elevation << "; basin area: " << area);
+			//g_debug("Bad Seed: " << seed.col() << ", " << seed.row() << "; elevation: " << elevation << "; basin area: " << barea);
 			// If the basin is too small, fill it with nodata. Do not collect more spill points.
-			TargetFillOperator<double, int> fop(m_dem, m_band, basinRaster.get(), m_band, seed.cellId(), props.nodata());
-			Grid::floodFill(seed.col(), seed.row(), fop, false, &minc, &minr, &maxc, &maxr, &area);
+			TargetFillOperator<int, int> fop(&basinRaster, 0, &basinRaster, 0, seed.cellId(), basinRaster.props().nodata());
+			Band<int>::floodFill(seed.col(), seed.row(), fop, true, &minc, &minr, &maxc, &maxr, &area);
 		}
 
 	}
@@ -483,72 +462,58 @@ int Flood::fillBasins(std::unique_ptr<MemRaster>& basinRaster, double elevation,
 	return m_basinList.size();
 }
 
-void Flood::saveBasinVector(const std::string& rfile, const std::string& vfile) {
-	g_debug("Saving vector " << vfile);
-	Raster rast(rfile);
-	FloodCallbacks cb;
-	geo::util::Status status(&cb, 0.0f, 1.0f);
-	rast.polygonize(vfile, "basin", "SQLite", rast.props().hsrid(), 1, false, false, "", 0, 1, Flood::cancel, status);
-}
-
-bool Flood::findSpillPoints(std::unique_ptr<MemRaster>& basinRaster, double elevation, bool mapped) {
+bool Flood::findSpillPoints(Band<int>& basinRaster, double elevation) {
 	g_debug("Finding spill points.");
 
 	m_spillPoints.clear();
 
-	geo::util::Bounds bounds(0, 0, m_dem->props().cols(), m_dem->props().rows());
+	const geo::util::Bounds bounds(0, 0, m_dem.props().cols(), m_dem.props().rows());
 
-	std::unordered_map<int, KDTree<Cell> > trees;
+	std::unordered_map<int, std::unique_ptr<mqtree<Cell>>> trees;
 	std::unordered_set<int> seen;
 
 	// Compare each basin to each other basin.
 	for (size_t i = 0; i < m_basinList.size(); ++i) {
 		for (size_t j = i + 1; j < m_basinList.size() && !Flood::cancel; ++j) {
 
-			g_debug("Basins " << i << ", " << j);
+			//g_debug("Basins " << i << ", " << j);
 			Basin& b0 = m_basinList[i];
 			Basin& b1 = m_basinList[j];
 			unsigned int id0 = b0.seedId();
 			unsigned int id1 = b1.seedId();
 
 			if(trees.find(id0) == trees.end()) {
-				trees.emplace(id0, 2);
-				KDTree<Cell>& q = trees[id0];
-				b0.computeEdges(*basinRaster, *m_dem, q);
-				q.build();
+				std::unique_ptr<mqtree<Cell>> t(new mqtree<Cell>(bounds.minx(), bounds.miny(), bounds.maxx(), bounds.maxy()));
+				b0.computeEdges(basinRaster, *t);
+				trees.emplace(id0, std::move(t));
 			}
 			if(trees.find(id1) == trees.end()) {
-				trees.emplace(id1, 2);
-				KDTree<Cell>& q = trees[id1];
-				b1.computeEdges(*basinRaster, *m_dem, q);
-				q.build();
+				std::unique_ptr<mqtree<Cell>> t(new mqtree<Cell>(bounds.minx(), bounds.miny(), bounds.maxx(), bounds.maxy()));
+				b1.computeEdges(basinRaster, *t);
+				trees.emplace(id1, std::move(t));
 			}
 
-			int count0 = trees[id0].size();
-			int count1 = trees[id1].size();
+			int count0 = trees.at(id0)->size();
+			int count1 = trees.at(id1)->size();
 
 			// Compare the distances; save the ones that are near enough.
-			KDTree<Cell>& cells0 = count0 < count1 ? trees[id0] : trees[id1];
-			KDTree<Cell>& cells1 = count0 < count1 ? trees[id1] : trees[id0];
-			std::vector<Cell*> result;
-			std::vector<double> dist;
-			double spillDist = m_maxSpillDist / std::abs(basinRaster->props().resolutionX());
+			mqtree<Cell>& cells0 = count0 < count1 ? *trees.at(id0) : *trees.at(id1);
+			mqtree<Cell>& cells1 = count0 < count1 ? *trees.at(id1) : *trees.at(id0);
+			std::vector<Cell> result;
+			double spillDist = m_maxSpillDist / std::abs(basinRaster.props().resX());
 
-			for(const Cell* c0 : cells0.items()) {
+			Cell c0;
+			while(cells0.next(c0)) {
 				if(Flood::cancel)
 					break;
-				seen.insert(c0->cellId());
-				cells1.knn(*c0, 1, std::back_inserter(result), std::back_inserter(dist));
-				for(size_t i = 0; i < result.size(); ++i) {
-					std::cerr << dist[i] << "\n";
-					if(dist[i] <= spillDist) {
-						seen.insert(result[i]->cellId());
-						// Create a spill point; copies the cells.
-						m_spillPoints.emplace_back(*c0, *result[i], elevation);
-					}
+				seen.insert(c0.cellId());
+				cells1.search(c0, spillDist, std::back_inserter(result));
+				for(const Cell& c : result) {
+					seen.insert(c.cellId());
+					// Create a spill point; copies the cells.
+					m_spillPoints.emplace_back(c0, c, elevation);
 				}
 				result.resize(0);
-				dist.resize(0);
 			}
 		}
 	}
@@ -557,23 +522,68 @@ bool Flood::findSpillPoints(std::unique_ptr<MemRaster>& basinRaster, double elev
 	return m_spillPoints.size();
 }
 
+/**
+ * The heuristic calculates the distance and modifies it using the slope. A horizontal
+ * has the normal 2d length. The distance is multiplied by the sine of the angle
+ * of the slope w/r/t 1 map unit.
+ */
+class heuristic {
+public:
+	Band<float>* dem;
+	heuristic(Band<float>* dem) : dem(dem) {}
+	double operator()(int cc, int cr, int gc, int gr) {
+		if(!dem->props().hasCell(cc, cr) || !dem->props().hasCell(gc, gr) ||
+				dem->get(cc, cr) == dem->props().nodata() || dem->get(gc, gr) == dem->props().nodata())
+			return geo::maxvalue<double>();
+		double a = dem->get(cc, cr);
+		double b = dem->get(gc, gr);
+		double d = std::sqrt(geo::sq(cc - gc) + geo::sq(cr - gr));
+		double m = std::sin(std::atan2(b - a, d));
+		return d + m * d;
+	}
+};
+
 void Flood::saveSpillPoints(unsigned int* id, std::ostream &out) {
 	g_debug("Outputting spill points.");
 	out << std::setprecision(12);
-	const GridProps& props = m_dem->props();
+	const GridProps& props = m_dem.props();
 	for (const SpillPoint& sp : m_spillPoints) {
 		const Cell& c1 = sp.cell1();
 		const Cell& c2 = sp.cell2();
-		double x1 = props.toCentroidX(c1.col());
-		double y1 = props.toCentroidY(c1.row());
-		double x2 = props.toCentroidX(c2.col());
-		double y2 = props.toCentroidY(c2.row());
+		double x1 = props.toX(c1.col());
+		double y1 = props.toY(c1.row());
+		double x2 = props.toX(c2.col());
+		double y2 = props.toY(c2.row());
 		double x3 = (x1 + x2) / 2.0;
 		double y3 = (y1 + y2) / 2.0;
-		double dist = std::sqrt(g_sq(x1 - x2) + g_sq(y1 - y2));
+		double dist = std::sqrt(geo::sq(x1 - x2) + geo::sq(y1 - y2));
+
+		std::string pathStr = "";
+		double maxElev = geo::minvalue<double>();
+		{
+			std::vector<std::pair<double, double>> path;
+			heuristic h(&m_dem);
+			m_dem.searchAStar(c1.col(), c1.row(), c2.col(), c2.row(), h, std::back_inserter(path), 1);
+			if(!path.empty()) {
+				std::stringstream ss;
+				ss << std::setprecision(12) << "\"LINESTRING(";
+				double v;
+				for(size_t i = 0; i < path.size(); ++i) {
+					double x = path[i].first;
+					double y = path[i].second;
+					if(i > 0) ss << ',';
+					ss << x << ' ' << y;
+					// Get the path's max elevation.
+					if((v = m_dem.get(x, y)) > maxElev)
+						maxElev = v;
+				}
+				ss << ")\"";
+				pathStr = ss.str();
+			}
+		}
 		out << ++(*id) << ", " << c1.seedId() << "," << x1 << "," << y1 << "," << c2.seedId() << ","
 				<< x2 << "," << y2 << "," << x3 << "," << y3 << ","
-				<< sp.elevation() << "," << dist << std::endl;
+				<< sp.elevation() << "," << dist << "," << maxElev << "," << pathStr << std::endl;
 	}
 }
 
@@ -581,34 +591,34 @@ void Flood::findMinima() {
 	g_debug("Finding minima.");
 
 	m_seeds.clear();
-	int cols = m_dem->props().cols();
-	int rows = m_dem->props().rows();
-	double nodata = m_dem->props().nodata();
+	int cols = m_dem.props().cols();
+	int rows = m_dem.props().rows();
+	double nodata = m_dem.props().nodata();
 	for (int r = 0; r < rows && !Flood::cancel; ++r) {
 		for (int c = 0; c < cols; ++c) {
 			bool skip = false;
 			double v;
-			if ((v = m_dem->getFloat(c, r, m_band)) == nodata)
+			if ((v = m_dem.get(c, r)) == nodata)
 				continue;
-			for (int rr = g_max(0, r - 1); !skip && rr < g_min(r + 2, rows); ++rr) {
-				for (int cc = g_max(0, c - 1); !skip && cc < g_min(c + 2, cols) && !Flood::cancel; ++cc) {
+			for (int rr = geo::max(0, r - 1); !skip && rr < geo::min(r + 2, rows); ++rr) {
+				for (int cc = geo::max(0, c - 1); !skip && cc < geo::min(c + 2, cols) && !Flood::cancel; ++cc) {
 					double v0;
-					if ((cc == c && rr == r) || (v0 = m_dem->getFloat(cc, rr, m_band)) == nodata)
+					if ((cc == c && rr == r) || (v0 = m_dem.get(cc, rr)) == nodata)
 						continue;
-					if (m_dem->getFloat(cc, rr, m_band) < m_dem->getFloat(c, r, m_band))
+					if (m_dem.get(cc, rr) < m_dem.get(c, r))
 						skip = true;
 				}
 			}
 			if (!skip)
-				m_seeds.push_back(Cell(0, c, r, m_dem->getFloat(c, r, m_band)));
+				m_seeds.push_back(Cell(0, c, r, m_dem.get(c, r)));
 		}
 	}
 }
 
-void Flood::worker(Flood* config, std::mutex* mtx, std::ofstream* ofs, std::queue<double>* elevations, bool mapped) {
+void Flood::worker(Flood* config, std::mutex* mtx, std::ofstream* ofs, std::queue<double>* elevations) {
 
 	Flood conf(*config);
-	conf.init(*mtx, mapped);
+	conf.init(*mtx);
 
 	g_debug("Building seed list...");
 	if (!conf.seedsFile().empty()) {
@@ -639,44 +649,43 @@ void Flood::worker(Flood* config, std::mutex* mtx, std::ofstream* ofs, std::queu
 
 		// Spill point ID. Needed?
 		unsigned int id = 0;
-		// To get the number of places.
-		double exp = std::pow(10, std::floor(-std::log10(conf.step())) + 1.0);
 
 		// The basin filename.
-		std::stringstream ss;
-		ss << conf.rdir() << "/" << (int) std::round(elevation * exp) << ".tif";
-		std::string rfile = ss.str();
+		std::string rfile = config->output().rasterFile(elevation);
 
-		std::unique_ptr<MemRaster> basinRaster;
+		// Set up the output raster.
+		GridProps props(conf.dem().props());
+		props.setBands(1);
+		props.setNoData(0);
+		props.setDataType(DataType::UInt32);
+		props.setWritable(true);
+		props.setCompress(true);
+
+		Band<int> basinRaster(rfile, props);
 
 		// Generate basins.
-		int basins = conf.fillBasins(basinRaster, elevation, mapped);
+		int basins = conf.fillBasins(basinRaster, elevation);
+
+		basinRaster.flush();
 
 		// Find and output spill points.
-		if (basins > 1 && !conf.spill().empty() && conf.findSpillPoints(basinRaster, elevation, mapped) > 0) {
+		if (basins > 1 && !conf.spill().empty() && conf.findSpillPoints(basinRaster, elevation) > 0) {
 			std::lock_guard<std::mutex> lk(*mtx);
 			conf.saveSpillPoints(&id, *ofs);
 		}
 
 		g_debug("Writing basin raster " << rfile);
 
-		const GridProps& props = basinRaster->props();
-		Raster bout(rfile, props);
-		for(int r = 0; r < props.rows() && !Flood::cancel; ++r)
-			basinRaster->writeTo(bout, props.cols(), 1, 0, r, 0, r);
+		basinRaster.flush();
 
 		// If desired, generate vectors.
-		if (basins > 0 && !conf.vdir().empty()) {
-			ss.str(std::string());
-			ss << conf.vdir() << "/" << (int) std::round(elevation * exp) << ".sqlite";
-			std::string vfile = ss.str();
-			conf.saveBasinVector(rfile, vfile);
-		}
+		if (basins > 0 && conf.output().doVectors())
+			conf.output().saveVector(basinRaster, elevation);
 	}
 
 }
 
-void Flood::flood(int numThreads, bool memMapped) {
+void Flood::flood(int numThreads) {
 
 	using namespace geo::flood::util;
 
@@ -691,62 +700,21 @@ void Flood::flood(int numThreads, bool memMapped) {
 	config.validateInputs();
 
 	if(!config.spill().empty()) {
-		Util::rm(spill());
+		rem(spill());
 		ofs.open(spill());
-		ofs << "id,id1,x1,y1,id2,x2,y2,xmidpoint,ymidpoint,elevation,distance" << std::endl;
+		ofs << "id,id1,x1,y1,id2,x2,y2,xmidpoint,ymidpoint,elevation,distance,maxElevation,path" << std::endl;
 	}
 
 	for(double e = start(); e <= end(); e += step())
 		elevations.push(e);
 
-	if(m_start == m_end && !m_outfile.empty()) {
+	std::mutex mtx;
+	for(int i = 0; i < numThreads; ++i)
+		threads.emplace_back(Flood::worker, &config, &mtx, &ofs, &elevations);
 
-		g_debug("Filling to " << m_end);
+	for(std::thread& th : threads)
+		th.join();
 
-		// Spill point ID. Needed?
-		unsigned int id = 0;
-
-		std::mutex mtx;
-		config.init(mtx, memMapped);
-
-		g_debug("Building seed list...");
-		if (!config.seedsFile().empty()) {
-			// Load the seeds if given.
-			config.loadSeeds(true);
-		} else {
-			// Otherwise find and use minima.
-			config.findMinima();
-		}
-
-		std::unique_ptr<MemRaster> basinRaster;
-
-		// Generate basins.
-		int basins = config.fillBasins(basinRaster, m_end, memMapped);
-
-		// Find and output spill points.
-		if (basins > 1 && !config.spill().empty() && config.findSpillPoints(basinRaster, m_end, memMapped) > 0) {
-			config.saveSpillPoints(&id, ofs);
-		}
-
-		const GridProps& props = basinRaster->props();
-		Raster bout(m_outfile, props);
-		for(int r = 0; r < props.rows() && !Flood::cancel; ++r)
-			basinRaster->writeTo(bout, props.cols(), 1, 0, r, 0, r);
-
-		// If desired, generate vectors.
-		if (basins > 0 && !config.vdir().empty()) {
-			std::string vec = Util::pathJoin(Util::parent(m_outfile), Util::basename(m_outfile) + ".sqlite");
-			config.saveBasinVector(m_outfile, vec);
-		}
-
-	} else {
-		std::mutex mtx;
-		for(int i = 0; i < numThreads; ++i)
-			threads.emplace_back(Flood::worker, &config, &mtx, &ofs, &elevations, memMapped);
-
-		for(std::thread& th : threads)
-			th.join();
-	}
 }
 
 
