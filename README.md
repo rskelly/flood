@@ -3,6 +3,8 @@
 `Flood` is an application that delinates basins on a digital terrain 
 model (DTM) and attempts to locate the 'spill points' between them.
 
+## Background
+
 Typical watershed and channel delination techniques us a least-cost 
 search algorithm to locate the path that a hypothetical water droplet 
 will follow as it moves down slope. This algorithm "floods" basins, 
@@ -13,8 +15,10 @@ each other. When such pairs of pixels are found, the least-cost path
 along with the flood elevation and the maximum height attained by
 the path.
 
-This algorithm was inspired by the unique hydrological conditions
-that prevail in the Peace-Athabasca Delta of Northern Alberta, Canada:
+![Peace-Athabasca Delta](assets/pad_map.png)
+
+This algorithm was inspired by the unique hydrological conditions ([1](https://onlinelibrary.wiley.com/doi/abs/10.1002/hyp.6420), [2](https://link.springer.com/article/10.1007/s11273-005-1114-1))
+that prevail in the [Peace-Athabasca Delta](https://en.wikipedia.org/wiki/Peace%E2%80%93Athabasca_Delta) of Northern Alberta, Canada:
 the Delta is littered with "perched" basins that recharge neither
 from precipitation nor groundwater, but from overland spillage due to ice jam
 flooding from the Peace and Athabasca Rivers. 
@@ -26,9 +30,9 @@ each basin, there is a definite least-cost path, according to the algorithm
 real-world processes. The `Flood` algorithm is designed to suggest the locations
 and elevations of *likely* spill points.
 
-This work was begun as part of an internship with Dr. Daniel Peters, with 
-Environment and Climate Change Canada's Water and Climate Impacts Research 
-Centre (W-CIRC) at the University of Victoria.
+This work was begun as part of an internship with [Dr. Daniel Peters](https://profils-profiles.science.gc.ca/en/profile/daniel-l-peters-phd-pgeo), with 
+Environment and Climate Change Canada's [Water and Climate Impacts Research 
+Centre](https://www.uvic.ca/research/centres/wcirc/) (W-CIRC) at the University of Victoria.
 
 ## Operation
 
