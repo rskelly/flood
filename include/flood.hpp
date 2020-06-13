@@ -37,98 +37,148 @@ namespace geo {
 		namespace util {
 
 			/**
-			 * Represents a grid cell.
+			 * \brief Represents a grid cell.
+			 *
 			 * Contains the grid coordinates, an ID and a value, such as elevation.
+			 *
+			 * The cell's priority dictates the order in which basins are merged. A basin
+			 * with a lower priority value will impart its ID to a higher-valued basins.
 			 */
 			class Cell {
 			private:
-				int m_col;
-				int m_row;
-				size_t m_cellId;
-				double m_value;
-				size_t m_seedId;
+				int m_col;			///<! The cell column.
+				int m_row;			///<! The cell row.
+				int m_cellId;		///<! The cell ID.
+				float m_value;		///<! The cell value.
+				int m_seedId;		///<! The ID of the seed that originated this cell.
+				int m_priority;		///<! The cell's priority.
 
 			public:
 
 				/**
-				 * Construct an empty cell with an automatic ID.
+				 * \brief Construct an empty cell with an automatic ID.
 				 */
 				Cell();
 
 				/**
-				 * Construct a new cell with the grid coordinates and an automatic ID.
-				 * \param col The column.
-				 * \param row The row.
-				 */
-				Cell(size_t seedId, int col, int row);
-
-				/**
-				 * Construct a new cell with the grid coordinates and an explicit ID.
-				 * \param id The ID.
-				 * \param col The column.
-				 * \param row The row.
-				 */
-				Cell(size_t id, size_t seedId, int col, int row);
-
-				/**
-				 * Construct a new cell with the grid coordinates and an explicit ID and value.
+				 * \brief Construct a new cell with the grid coordinates and an explicit ID and value.
+				 *
 				 * \param id The ID.
 				 * \param col The column.
 				 * \param row The row.
 				 * \param value The value.
+				 * \param priority The basin's priority.
 				 */
-				Cell(size_t id, size_t seedId, int col, int row, double value);
+				Cell(int id, int seedId, int col, int row, float value, int priority);
 
 				/**
-				 * Construct a new cell with the grid coordinates and an automatic ID and explicit value.
+				 * \brief Construct a new cell with the grid coordinates and an automatic ID and explicit value.
+				 *
 				 * \param col The column.
 				 * \param row The row.
 				 * \param value The value.
 				 */
-				Cell(size_t seedId, int col, int row, double value);
+				Cell(int seedId, int col, int row, float value, int proiority = geo::maxvalue<int>());
 
 				/**
-				 * Return the coordinate by axis index.
+				 * \brief Return the coordinate by axis index.
+				 *
+				 * The value is a double to accommodate the tree class template.
+				 *
 				 * \param idx The index
+				 * \return The coordinate value.
 				 */
 				double operator[](int idx) const;
 
-				double x() const;
-
-				double y() const;
-
-				int row() const;
-
-				int col() const;
-
-				size_t cellId() const;
-
-				size_t seedId() const;
-
-				double value() const;
+				/**
+				 * \brief Return true if this Cell is strictly less than the other Cell for ordering.
+				 *
+				 * \param other Another Cell.
+				 * \return True if this Cell is strictly less than the other Cell for ordering.
+				 */
+				bool operator<(const Cell& other) const;
 
 				/**
-				 * Return the distance between cells in map units, given the resolution of the original raster.
+				 * \brief Return the x coordinate as a double.
+				 *
+				 * This is really the column value.
+				 *
+				 * \return The x coordinate as a double.
 				 */
-				double distance(const Cell& other, double resx, double resy) const;
+				double x() const;
+
+				/**
+				 * \brief Return the y coordinate as a double.
+				 *
+				 * This is really the row value.
+				 *
+				 * \return The y coordinate as a double.
+				 */
+				double y() const;
+
+				/**
+				 * \brief Return the cell's row index in the raster.
+				 *
+				 * \return The cell's row.
+				 */
+				int row() const;
+
+				/**
+				 * \brief Return the cell's column index in the raster.
+				 *
+				 * \return The cell's column.
+				 */
+				int col() const;
+
+				/**
+				 * \brief Return the cell's ID.
+				 *
+				 * \return The cell's ID.
+				 */
+				int cellId() const;
+
+				/**
+				 * \brief Return the ID of the seed that originated this cell.
+				 *
+				 * \return The ID of the seed that originated this cell.
+				 */
+				int seedId() const;
+
+				/**
+				 * \brief Return the cell's value.
+				 *
+				 * \return The cell's value.
+				 */
+				float value() const;
+
+				/**
+				 * \brief Return the Cartesian distance between cells in map units, given the resolution of the original raster.
+				 *
+				 * \param other The other Cell.
+				 * \param resx The x-resolution of the raster.
+				 * \param resy The y-resolution of the raster.
+				 * \return The Cartesian distance between this Cell and another.
+				 */
+				float distance(const Cell& other, float resx, float resy) const;
 
 			};
 
-			// Represents a basin, with bounds and area and the ID of the seed that spawned it.
+			/**
+			 * \brief Represents a basin, with bounds and area and the ID of the seed that spawned it.
+			 */
 			class Basin {
 			private:
-				unsigned int m_id;
-				int m_minc;
-				int m_minr;
-				int m_maxc;
-				int m_maxr;
-				int m_area;
-				int m_band;
+				int m_id;		///<! The ID of this basin, derived from the ID of the seed that originated it.
+				int m_minc;		///<! The minimum raster column of the basin's bounding box.
+				int m_minr;		///<! The minimum raster row of the basin's bounding box.
+				int m_maxc;		///<! The maximum raster column of the basin's bounding box.
+				int m_maxr;		///<! The maximum raster row of the basin's bounding box.
+				int m_area;		///<! The the pixel area of the basin (not of its bounding box).
 
 			public:
 
 				/**
-				 * Construct a basin with the given seed ID, extent and area.
+				 * \brief Construct a basin with the given seed ID, extent and area.
 				 *
 				 * \param seedId The seed ID.
 				 * \param minc The minimum column index.
@@ -137,189 +187,428 @@ namespace geo {
 				 * \param maxr The maximum row index.
 				 * \param area The basin area.
 				 */
-				Basin(unsigned int seedId, int minc, int minr, int maxc, int maxr, int area);
+				Basin(int seedId, int minc, int minr, int maxc, int maxr, int area);
 
 				/**
-				 * Make a list of all the cells that are on the edges of this basin and are
-				 * also a local minimum.
+				 * \brief Make a list of all the cells that are on the edges of this basin and are also a local minimum.
 				 *
 				 * \param grd The flood fill grid.
-				 * \param edgeCells A ,mqtree to insert the cells into.
-				 * @return The number of cells found.
+				 * \param edgeCells An mqtree to insert the cells into.
+				 * \return The number of cells found.
 				 */
 				int computeEdges(Band<int>& grd, mqtree<Cell>& edgeCells);
 
 				/**
-				 * Return the basins seed ID.
+				 * \brief Return the basin's seed ID.
 				 *
-				 * @return The seed ID.
+				 * \return The seed ID.
 				 */
-				unsigned int seedId() const;
+				int seedId() const;
 
 			};
 
-			// A flood fill operator that fills pixels whose values are lower than
-			// the given elevation.
+			/**
+			 * \brief A flood fill operator that fills pixels whose values are lower than the given elevation.
+			 */
 			class LEFillOperator: public FillOperator<float, int> {
 			private:
-				Band<float>* m_src;
-				Band<int>* m_dst;
-				double m_elevation;
-				double m_nodata;
-				unsigned int m_id;
-				int m_nofill;
-				int m_srcBand;
-				int m_dstBand;
+				Band<float>* m_src;		///<! The source raster (DEM).
+				Band<int>* m_dst;		///<! The destination raster (mask).
+				float m_elevation;		///<! The fill elevation.
+				float m_nodata;			///<! The source nodata value.
+				int m_id;				///<! The ID to fill a region with.
+				int m_target;			///<! The target value to fill with the ID (zero).
 
 			public:
 
-				LEFillOperator(Band<float>* src, int srcBand, Band<int>* dst, int dstBand, double elevation, unsigned int id);
+				/**
+				 * \brief Construct the operator with the given rasters, target elevation and fill ID.
+				 *
+				 * \param src The source raster (DEM).
+				 * \param dst The destination raster (mask).
+				 * \param elevation The target elevation.
+				 * \param id The ID to fill a region with.
+				 */
+				LEFillOperator(Band<float>* src, Band<int>* dst, float elevation, int id);
 
+				/**
+				 * \brief Return true if the cell should be filled.
+				 *
+				 * \param col The column to check.
+				 * \param row The row to check.
+				 * \return True if the cell should be filled.
+				 */
 				bool shouldFill(int col, int row) const;
 
+				/**
+				 * \brief Fill the region starting at the given column and row.
+				 *
+				 * \param col The column to fill from.
+				 * \param row The row to fill from.
+				 */
 				void fill(int col, int row) const;
 
-				void setFill(unsigned int fill);
+				/**
+				 * \brief Set the fill value.
+				 *
+				 * \param fill The fill value.
+				 */
+				void setFill(int fill);
 
-				void setNoFill(int nofill);
+				/**
+				 * \brief Set the target value in the destination.
+				 *
+				 * Pixels without this value are ignored.
+				 *
+				 * \param target The target value in the destination.
+				 */
+				void setTarget(int target);
 
+				/**
+				 * \brief Return the properties of the source raster.
+				 *
+				 * \return The properties of the source raster.
+				 */
 				const GridProps& srcProps() const;
 
+				/**
+				 * \brief Return the properties of the destination raster.
+				 *
+				 * \return The properties of the destination raster.
+				 */
             	const GridProps& dstProps() const;
 
             	~LEFillOperator();
 
 			};
 
-			// Represents a spill point between two cells.
+			/**
+			 * \brief Represents a spill point between two cells.
+			 */
 			class SpillPoint {
 			private:
-				Cell m_c1;
-				Cell m_c2;
-				double m_elevation;
+				Cell m_c1;			///<! A Cell representing one side of the spill.
+				Cell m_c2;			///<! A Cell representing one side of the spill.
+				float m_elevation;	///<! The spill elevation.
 			public:
 
 				/**
-				 * Create a spill point. Copies the given cells.
+				 * \brief Create a spill point. Copies the given cells.
+				 *
+				 * \param c1 A Cell.
+				 * \param c2 A Cell.
+				 * \param elevation The spill elevation.
 				 */
-				SpillPoint(const Cell& c1, const Cell& c2, double elevation);
-
-				const Cell& cell1() const;
-
-				const Cell& cell2() const;
-
-				double elevation() const;
+				SpillPoint(const Cell& c1, const Cell& c2, float elevation);
 
 				/**
-				 * Return the centroid of the line connecting the two cells.
+				 * \brief Return on of the Cells.
+				 *
+				 * \return A Cell.
 				 */
-				void centroid(int* col, int* row) const;
+				const Cell& cell1() const;
+
+				/**
+				 * \brief Return on of the Cells.
+				 *
+				 * \return A Cell.
+				 */
+				const Cell& cell2() const;
+
+				/**
+				 * \brief Return the spill elevation.
+				 *
+				 * \return The spill elevation.
+				 */
+				float elevation() const;
+
+				/**
+				 * \brief Return the centroid of the line connecting the two cells.
+				 *
+				 * \param[out] col The centroid column.
+				 * \param[out] row The centroid row.
+				 */
+				void centroid(int& col, int& row) const;
 
 				~SpillPoint();
 
 			};
 
+			/**
+			 * \brief A heuristic for use in the A* search algorithm for spill paths.
+			 *
+			 * The heuristic calculates the distance and modifies it using the slope. A horizontal
+			 * has the normal 2d length. The distance is multiplied by the sine of the angle
+			 * of the slope w/r/t 1 map unit.
+			 */
+			class heuristic {
+			public:
+				Band<float>* dem;	///<! The raster to search on.
+
+				/**
+				 * \brief Construct the heuristic on the given raster.
+				 *
+				 * \param dem A raster to search.
+				 */
+				heuristic(Band<float>* dem);
+
+				/**
+				 * \brief The search operator.
+				 *
+				 * \param cc The start column.
+				 * \param cr The start row.
+				 * \param gc The goal column.
+				 * \param gr The goal row.
+				 * \return The cost associated with the path from cc/cr to gc/gr.
+				 */
+				float operator()(int cc, int cr, int gc, int gr);
+
+			};
+
+			/**
+			 * \brief An abstract class for saving basin rasters and geometries.
+			 *
+			 * Subclasses will implement ways to save vectors. The base class
+			 * provides the ability to save rasters.
+			 */
+			class BasinOutput {
+			public:
+				int id;				///<! The current record ID.
+				std::string rdir;	///<! The raster output directory.
+
+				/**
+				 * \brief Return true if the object is configured correctly.
+				 *
+				 * \return True if the object is configured correctly.
+				 */
+				virtual bool valid() const;
+
+				/**
+				 * \brief Save vector versions of the basin rasters.
+				 *
+				 * \param The grid containing basins.
+				 * \param elevation The elevation from which the basins are derived.
+				 */
+				virtual void saveVectors(Band<int>& basins, float elevation) = 0;
+
+				/**
+				 * \brief Prepare the object for writing output.
+				 */
+				void prepare();
+
+				/**
+				 * \brief Return the path of the file for saving basins corresponding to the given elevation.
+				 *
+				 * \param elevation The flood elevation.
+				 * \return The path of the file for saving basins corresponding to the given elevation.
+				 */
+				std::string rasterFile(float elevation) const;
+
+				virtual ~BasinOutput() {}
+			};
+
+			/**
+			 * \brief A dummy implementation of the BasinOutput class.
+			 *
+			 * Saving vectors is a no-op. Rasters only.
+			 */
+			class DummyBasinOutput : public BasinOutput {
+			public:
+
+				bool valid() const;
+
+				void saveVectors(Band<int>&, float);
+
+			};
+
+			/**
+			 * \brief An abstract class for saving spill paths between basins.
+			 *
+			 * Subclasses will implement ways to save vectors.
+			 */
+			class SpillOutput {
+			public:
+				int id;					///<! The current record ID.
+				std::string projection;	///<! The projection of the dataset.
+
+				/**
+				 * \brief Return true if the object is configured correctly.
+				 *
+				 * \return True if the object is configured correctly.
+				 */
+				virtual bool valid() const = 0;
+
+				/**
+				 * \brief Prepare the object for writing output.
+				 */
+				virtual void prepare() = 0;
+
+				/**
+				 * \brief Save the spill points/paths.
+				 *
+				 * \param dem The raster from which basins are derived.
+				 * \param spillPoints The list of spill points.
+				 */
+				virtual void saveSpillPoints(Band<float>& dem, const std::vector<SpillPoint>& spillPoints) = 0;
+
+				virtual ~SpillOutput() {}
+			};
+
+			/**
+			 * \brief A dummy class for spill output.
+			 *
+			 * Saving spill points is a no-op.
+			 */
+			class DummySpillOutput : public SpillOutput {
+			public:
+
+				bool valid() const;
+
+				void prepare();
+
+				void saveSpillPoints(Band<float>& dem, const std::vector<SpillPoint>& spillPoints);
+
+			};
+
+			/**
+			 * \brief Vectorizes and saves basin outlines to a relational database.
+			 */
+			class BasinDBOutput : public BasinOutput {
+			public:
+				std::string conn;			///<! The DB connection string. (e.g., "PG:dbname=... etc.")
+				std::string layer;			///<! The DB layer (table) name.
+				std::string idField;		///<! The primary key (integer) field.
+				std::string elevationField;	///<! The elevation field.
+
+				bool valid() const;
+
+				void prepare();
+
+				void saveVectors(Band<int>& rast, float elev);
+
+			};
+
+			/**
+			 * \brief Saves spill points to a relational database.
+			 *
+			 * Spill paths are saved as linestring geometries.
+			 */
+			class SpillDBOutput : public SpillOutput {
+			private:
+				GDALDataset* ds;				///<! The dataset for writing.
+				OGRLayer* lyr;					///<! The layer for writing.
+				OGRGeometryFactory gf;			///<! Factory for geometries.
+				OGRSpatialReference sr;			///<! Spatial reference.
+			public:
+				std::string conn;				///<! The database connection string. (e.g., "PG:dbname=... etc.")
+				std::string layer;				///<! The database layer (table).
+				std::string idField;			///<! The primary key (integer) field.
+				std::string bid1Field;			///<! The ID of basin1.
+				std::string bid2Field;			///<! The ID of basin2.
+				std::string elevationField;		///<! The elevation field.
+				std::string maxElevationField;	///<! The field for maximum elevation crossed by the path.
+
+				bool valid() const;
+
+				void prepare();
+
+				void saveSpillPoints(Band<float>& dem, const std::vector<SpillPoint>& spillPoints);
+
+				~SpillDBOutput();
+
+			};
+
+			/**
+			 * \brief Vectorizes and saves basin rasters to files in a folder.
+			 */
+			class BasinFileOutput : public BasinOutput {
+			public:
+				std::string vdir;	///<! The vector output folder.
+
+				bool valid() const;
+
+				void prepare();
+
+				void saveVectors(Band<int>& rast, float elevation);
+
+			};
+
+			/**
+			 * \brief Saves spill points to a CSV file.
+			 *
+			 * Paths are serialized as WKT linestrings.
+			 */
+			class SpillFileOutput : public SpillOutput {
+			public:
+				std::string spillFile;		///!< The output file.
+				std::ofstream out;			///!< The output stream.
+
+				bool valid() const;
+
+				void prepare();
+
+				void saveSpillPoints(Band<float>& dem, const std::vector<SpillPoint>& spillPoints);
+			};
+
+			/**
+			 * \brief Represents a break line.
+			 *
+			 * Use to create, e.g., an artificial blockage, such as
+			 * an ice jam.
+			 */
+			class BreakLine {
+			public:
+				float x0;		///<! Start x-coordinate.
+				float y0;		///<! Start y-coordinate.
+				float x1;		///<! End x-coordinate.
+				float y1;		///<! End y-coordinate.
+				float value;	///<! The "height" of the breakline.
+
+				/**
+				 * \brief Construct a breakline.
+				 *
+				 * \param Start x-coordinate.
+				 * \param Start y-coordinate.
+				 * \param End x-coordinate.
+				 * \param End y-coordinate.
+				 * \param The "height" of the breakline.
+				 */
+				BreakLine(float x0, float y0, float x1, float y1, float value);
+
+			};
+
 		} // util
+
 
 		using namespace flood::util;
 
-		class Output {
-		public:
-			std::string rdir;
-			virtual bool valid() const { return false; }
-			virtual void prepare() const {};
-			virtual bool doVectors() const { return false; }
-			virtual void saveVector(Band<int>& basins, float elevation) const {}
-			std::string rasterFile(float elevation) const {
-				std::stringstream ss;
-				ss << rdir << "/" << (int) (elevation * 10000) << ".tif";
-				return ss.str();
-			}
-			virtual ~Output() {}
-		};
-
-		class DBOutput : public Output {
-		public:
-			std::string conn;
-			std::string layer;
-			std::string id;
-			std::string elevation;
-			bool valid() const {
-				return !rdir.empty() && !conn.empty() && !layer.empty() && !id.empty() && !elevation.empty();
-			}
-			void prepare() const {
-				if(!rdir.empty() && !isdir(rdir))
-					makedir(rdir);
-				if(!isdir(rdir))
-					throw std::runtime_error("Raster output directory does not exist and could not be created.");
-			}
-			bool doVectors() const { return true; }
-			void saveVector(Band<int>& rast, float elev) const {
-				std::vector<PolygonValue> fields = {{elevation, elev}};
-				rast.polygonizeToTable(conn, layer, id, fields);
-			}
-		};
-
-		class FileOutput : public Output {
-		public:
-			std::string vdir;
-			bool valid() const {
-				return !rdir.empty();
-			}
-			void prepare() const {
-				if(!vdir.empty() && !isdir(vdir))
-					makedir(vdir);
-				if(!vdir.empty() && !isdir(vdir))
-					throw std::runtime_error("Vector output directory does not exist and could not be created.");
-				if(!rdir.empty() && !isdir(rdir))
-					makedir(rdir);
-				if(!isdir(rdir))
-					throw std::runtime_error("Raster output directory does not exist and could not be created.");
-			}
-			bool doVectors() const { return !vdir.empty(); }
-			void saveVector(Band<int>& rast, float elevation) const {
-				std::stringstream ss;
-				ss << vdir << "/" << (int) (elevation * 10000) << ".sqlite";
-				std::string vfile = ss.str();
-				rast.polygonizeToFile(vfile, "basins", "bid", "SQLite");
-			}
-		};
-
-		class BreakLine {
-		public:
-			double x0;
-			double y0;
-			double x1;
-			double y1;
-			float value;
-			BreakLine(double x0, double y0, double x1, double y1, float value) :
-				x0(x0), y0(y0), x1(x1), y1(y1), value(value) {}
-		};
 
 		class Flood {
 		private:
-			double m_start;
-			double m_end;
-			double m_step;
-			double m_minBasinArea;
-			double m_maxSpillDist;
-			unsigned int m_t; // number of threads
-			unsigned int m_band;
-			Band<float> m_dem;
-			const Output* m_output;
-			std::string m_input;
-			std::string m_spill;
-			std::string m_fseeds;
-			std::vector<Cell> m_seeds;
-			std::vector<Basin> m_basinList;
-			std::vector<SpillPoint> m_spillPoints;
-			std::vector<BreakLine> m_breakLines;
+			float m_start;								///<! The start elevation.
+			float m_end;								///<! The end elevation (inclusive).
+			float m_step;								///<! The elevation step.
+			float m_minBasinArea;						///<! Ignore basins smaller than this.
+			float m_maxSpillDist;						///<! Ignore spill paths longer than this (as the crow flies).
+			int m_t; 									///<! Number of threads
+			int m_band;									///<! The source band in the DEM.
+			Band<float> m_dem;							///<! The DEM.
+			BasinOutput* m_basinOutput;					///<! The basin output object.
+			SpillOutput* m_spillOutput;					///<! The spill point output object.
+			std::string m_input;						///<! The filename of the DEM.
+			std::string m_fseeds;						///<! The input handle for the seed file.
+			std::vector<Cell> m_seeds;					///<! List of seed cells.
+			std::vector<Basin> m_basinList;				///<! List of basins.
+			std::vector<SpillPoint> m_spillPoints;		///<! List of spill points.
+			std::vector<BreakLine> m_breakLines;		///<! List of breaklines.
+			std::mutex m_qmtx; 							///<! Mutex to protect the job queue.
 
 		public:
-			static bool cancel;
+
+			bool cancel;	///<! If true, current operations are cancelled.
 
 			/**
-			 * Create a Flood object.
+			 * \brief Create a Flood object.
 			 *
 			 * \param input The DEM file.
 			 * \param band Input raster band.
@@ -333,90 +622,151 @@ namespace geo {
 			 * \param maxSpillDist The maximum distance between two basins before they are suspected of connecting.
 			 * \param breakLines A list of breaklines to apply to the input raster.
 			 */
-			Flood(const std::string& input, int band, const Output& output,
-					const std::string& spill, const std::string& seeds,
-					double start, double end, double step,
-					double minBasinArea, double maxSpillDist,
+			Flood(const std::string& input, int band,
+					BasinOutput* basinOutput, SpillOutput* spillOutput,
+					const std::string& seeds,
+					float start, float end, float step,
+					float minBasinArea, float maxSpillDist,
 					const std::vector<BreakLine>& breakLines);
 
 			/**
-			 * Copy the given Flood object.
+			 * \brief Return the queue mutex.
+			 *
+			 * \return The queue mutex.
 			 */
-			Flood(const Flood& conf);
+			std::mutex& qmtx();
 
 			/**
-			 * Check the inputs, throw an exception if any are invalid.
+			 * \brief Check the inputs, throw an exception if any are invalid.
 			 */
 			void validateInputs();
 
 			~Flood();
 
+			/**
+			 * \brief Return the input DEM file.
+			 */
 			const std::string& input() const;
 
-			const Output& output() const;
-
-			const std::string& rdir() const;
-
-			const std::string& spill() const;
-
-			const std::string& seedsFile() const;
-
-			double start() const;
-
-			double end() const;
-
-			double step() const;
-
-			double minBasinArea() const;
-
-			double maxSpillDist() const;
+			/**
+			 * \brief Return a reference to the BasinOutput object.
+			 *
+			 * \return A reference to the BasinOutput object.
+			 */
+			BasinOutput& basinOutput();
 
 			/**
-			 * Load the seeds from the seeds file. If header is given,
-			 * the first row is read and discarded.
+			 * \brief Return a reference to the SpillOutput object.
+			 *
+			 * \return A reference to the SpillOutput object.
+			 */
+			SpillOutput& spillOutput();
+
+			/**
+			 * \brief Return a reference to the file containing seeds.
+			 *
+			 * \return A reference to the file containing seeds.
+			 */
+			const std::string& seedsFile() const;
+
+			/**
+			 * \brief Return a reference to the spill points list.
+			 *
+			 * \return A reference to the spill points list.
+			 */
+			const std::vector<SpillPoint>& spillPoints() const;
+
+			/**
+			 * \brief Return the start elevation.
+			 *
+			 * \return The start elevation.
+			 */
+			float start() const;
+
+			/**
+			 * \brief Return the end elevation (inclusive).
+			 *
+			 * \return The end elevation.
+			 */
+			float end() const;
+
+			/**
+			 * \brief Return the elevation step.
+			 *
+			 * \return The elevation step.
+			 */
+			float step() const;
+
+			/**
+			 * \brief Return the minimum basin area.
+			 *
+			 * \return The minimum basin area.
+			 */
+			float minBasinArea() const;
+
+			/**
+			 * \brief Return the maximum spill distance.
+			 *
+			 * \return The maximum spill distnance.
+			 */
+			float maxSpillDist() const;
+
+			/**
+			 * \brief Load the seeds from the seeds file.
+			 *
+			 * If header is given, the first row is read and discarded.
+			 *
+			 * \param header Set to true if the first line of the file contains column labels.
 			 */
 			void loadSeeds(bool header = false);
 
+			/**
+			 * \brief Return a reference to the list of seeds.
+			 *
+			 * \return A reference to the list of seeds.
+			 */
 			const std::vector<Cell>& seeds() const;
 
+			/**
+			 * \brief Return a reference to the input DEM.
+			 *
+			 * \return A reference to the input DEM.
+			 */
 			Band<float>& dem();
 
 			/**
-			 * Initialize the flood processor.
-			 *
-			 * \param mtx A mutex to protect resources.
+			 * \brief Initialize the flood processor.
 			 */
-			void init(std::mutex& mtx);
+			void init();
 
 			/**
-			 * Perform flood filling and identify basins.
+			 * \brief Perform flood filling and identify basins.
+			 *
 			 * \param basinRaster An empty unique_ptr to contain a Band<float>.
 			 * \param elevation The elevation to fill to.
 			 * \param mapped Set to true to used mapped memory. Slow.
-			 * @return An int representing the number of basins created.
+			 * \return An int representing the number of basins created.
 			 */
-			int fillBasins(Band<int>& basinRaster, double elevation);
-
-			bool findSpillPoints(Band<int>& basinRaster, double elevation);
+			int fillBasins(Band<int>& basinRaster, float elevation);
 
 			/**
-			 * Output the spill points to a stream, with comma delimiters.
-			 * The fields are: ID1, x1, y1, ID2, x2, y2, midpoint x, midpoint y, distance
+			 * \brief Find the spill points between basins represented in the raster.
+			 *
+			 * \param basinRaster The raster containing delineated basins.
+			 * \param elevation The elevation for which basins are derived.
+			 * \return True if spill points are found.
 			 */
-			void saveSpillPoints(unsigned int* id, std::ostream &out);
+			bool findSpillPoints(Band<int>& basinRaster, float elevation);
 
 			/**
-			 * Find the cells at the bottoms of depressions.
+			 * \brief Find the cells at the bottoms of depressions.
+			 *
+			 * This is used when no seed file is provided.
 			 */
 			void findMinima();
 
 			/**
-			 * Called by flood, used by threads.
-			 */
-			static void worker(Flood* config, std::mutex* mtx, std::ofstream* ofs, std::queue<double>* elevations);
-
-			/**
-			 * Start the flood process.
+			 * \brief Start the flood process.
 			 *
 			 * \param numThreads The number of threads to run.
 			 */

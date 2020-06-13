@@ -49,7 +49,7 @@ link_directories(./build/lib ./build/bin
 
 # Build programs #####################################################################################################
 
-add_executable (flood src/flood_app.cpp src/flood.cpp)
+add_executable (flood src/flood_app.cpp src/flood.cpp src/util.cpp)
 target_link_libraries (flood ${GDAL_LIBRARY} geogrid geoutil)
 
 # Install ###########################################################################################################
