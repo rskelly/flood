@@ -15,7 +15,7 @@ each other. When such pairs of pixels are found, the least-cost path
 along with the flood elevation and the maximum height attained by
 the path.
 
-![Peace-Athabasca Delta](assets/pad_map.png)
+<img src="assets/pad_map.png" alt="Peace-Athabasca Delta" />
 
 This algorithm was inspired by the unique hydrological conditions ([1](https://onlinelibrary.wiley.com/doi/abs/10.1002/hyp.6420), [2](https://link.springer.com/article/10.1007/s11273-005-1114-1))
 that prevail in the [Peace-Athabasca Delta](https://en.wikipedia.org/wiki/Peace%E2%80%93Athabasca_Delta) of Northern Alberta, Canada:
@@ -24,7 +24,7 @@ from precipitation nor groundwater, but from overland spillage due to ice jam
 flooding from the Peace and Athabasca Rivers. 
 
 The relief of the delta is extraordinarily flat. Excluding Shield outcrops, 
-over the 5000k expanse of the Delta, the elevation change might be 1-2m. For 
+over the 5000km<sup>2</sup> expanse of the Delta, the elevation change might be 1-2m. For 
 each basin, there is a definite least-cost path, according to the algorithm 
 (there can't not be!) but this strategy isn't necessarily reflective of 
 real-world processes. The `Flood` algorithm is designed to suggest the locations
