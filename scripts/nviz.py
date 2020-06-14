@@ -25,7 +25,7 @@ import psycopg2 as pg
 
 # Set to true to overwrite existing outputs. Otherwise, 
 # set to false and merely delete the images you want redone.
-overwrite = False
+overwrite = True
 
 # Database connection parameters for vectors.
 dbname = 'ec'
@@ -35,7 +35,7 @@ host = 'localhost'
 layer = 'spill_4m'
 
 # Rendermode. Coarse is useful for first-run checking.
-nviz_mode = 'fine' # 'coarse'
+nviz_mode = 'coarse'#'fine' # 'coarse'
 
 # Sequence of render jobs. The params are:
 # active: Set to true to run the job; false to ignore it.
@@ -62,7 +62,7 @@ nviz_mode = 'fine' # 'coarse'
 # basin_ids: The basin IDs of interest. Determines the loading of spill paths.
 sequences = [
 	{
-		'active': False,
+		'active': True,
 		'name': 'Horseshoe Slough',
 		'out_dir': '/home/rob/Desktop/ec/videos/horseshoe_slough',
 		'out_pattern': '{e:d}_{n}',
@@ -87,7 +87,7 @@ sequences = [
 		'basin_ids': (16, 23)
 	},
 	{
-		'active': True,
+		'active': False,
 		'name': 'PAD 58/Lake 540',
 		'out_dir': '/home/rob/Desktop/ec/videos/pad58_lake540',
 		'out_pattern': '{e:d}_{n}',
@@ -97,7 +97,7 @@ sequences = [
 		'dem_name': 'pad_dem_4m',
 		'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
 		'rgb_name': 'pad_ortho',
-		'elev_range': (209.5, 211.5),
+		'elev_range': (209.5, 212),
 		'elev_step': 0.01,
 		'elev_mult': 10000., 
 		'size': (1920, 1080),
@@ -111,7 +111,7 @@ sequences = [
 		'basin_ids': (17, 18, 23)
 	},
 	{
-		'active': False,
+		'active': True,
 		'name': 'Lake 50',
 		'out_dir': '/home/rob/Desktop/ec/videos/lake50',
 		'out_pattern': '{e:d}_{n}',
@@ -121,20 +121,21 @@ sequences = [
 		'dem_name': 'pad_dem_4m',
 		'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
 		'rgb_name': 'pad_ortho',
-		'elev_range': (209.5, 211.5),
+		'elev_range': (208.5, 211.5),
 		'elev_step': 0.01,
 		'elev_mult': 10000., 
 		'size': (1920, 1080),
-		'position': ((.417, .475), (.420, .48)),
+		'position': ((.52, .46), (.52, .47)),
 		'height': 500,
 		'zexag': 2,
-		'focus': ((482157.983, 6521967.743, 350), (482655.920, 6522439.472, 300)),
+		'focus': ((482161.123, 6521982.894, 200), (482161.123, 6521982.894, 200)),
 		'steps_per_elev': 3,
-		'perspective': 45.,
+		'perspective': 30.,
 		'color_table': '/home/rob/Desktop/ec/videos/color.txt',
+		'basin_ids': (7, 21, 23),
 	},
 	{
-		'active': False,
+		'active': True,
 		'name': 'PAD 37 - Rocher Pond',
 		'out_dir': '/home/rob/Desktop/ec/videos/pad37',
 		'out_pattern': '{e:d}_{n}',
@@ -144,20 +145,21 @@ sequences = [
 		'dem_name': 'pad_dem_4m',
 		'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
 		'rgb_name': 'pad_ortho',
-		'elev_range': (209.5, 211.5),
+		'elev_range': (209.0, 210.3),
 		'elev_step': 0.01,
 		'elev_mult': 10000., 
 		'size': (1920, 1080),
-		'position': ((.417, .475), (.420, .48)),
+		'position': ((.53, .48), (.51, .48)),
 		'height': 500,
 		'zexag': 2,
-		'focus': ((482957.303, 6522072.572, 350), (482393.848, 6521443.599, 300)),
+		'focus': ((483692.060, 6521479.497, 200), (483692.060, 6521479.497, 200)),
 		'steps_per_elev': 3,
-		'perspective': 45.,
+		'perspective': 30.,
 		'color_table': '/home/rob/Desktop/ec/videos/color.txt',
+		'basin_ids': (7, 21, 23),
 	},
 	{
-		'active': False,
+		'active': True,
 		'name': 'PAD 5b - Mud Lake',
 		'out_dir': '/home/rob/Desktop/ec/videos/pad5b',
 		'out_pattern': '{e:d}_{n}',
@@ -167,20 +169,21 @@ sequences = [
 		'dem_name': 'pad_dem_4m',
 		'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
 		'rgb_name': 'pad_ortho',
-		'elev_range': (208.5, 210.2),
+		'elev_range': (208.5, 210.5),
 		'elev_step': 0.01,
 		'elev_mult': 10000., 
 		'size': (1920, 1080),
-		'position': ((.417, .475), (.420, .48)),
-		'height': 500,
+		'position': ((.48, .51), (.49, .51)),
+		'height': 750,
 		'zexag': 2,
-		'focus': ((481044.178, 6517702.522, 300), (480185.892, 6517204.586, 300)),
+		'focus': ((479883.281, 6517205.541, 200), (479883.281, 6517205.541, 200)),
 		'steps_per_elev': 3,
-		'perspective': 45.,
+		'perspective': 30.,
 		'color_table': '/home/rob/Desktop/ec/videos/color.txt',
+		'basin_ids': (11, 14, 5, 15, 23),
 	},
 	{
-		'active': False,
+		'active': True,
 		'name': 'Lake 582',
 		'out_dir': '/home/rob/Desktop/ec/videos/lake582',
 		'out_pattern': '{e:d}_{n}',
@@ -194,13 +197,14 @@ sequences = [
 		'elev_step': 0.01,
 		'elev_mult': 10000., 
 		'size': (1920, 1080),
-		'position': ((.417, .475), (.420, .48)),
+		'position': ((.50, .50), (.49, .50)),
 		'height': 500,
 		'zexag': 2,
-		'focus': ((479063.897, 6520596.779, 300), (478959.068, 6520039.876, 300)),
+		'focus': ((479237.519, 6520570.572, 200), (479237.519, 6520570.572, 200)),
 		'steps_per_elev': 3,
-		'perspective': 45.,
+		'perspective': 30.,
 		'color_table': '/home/rob/Desktop/ec/videos/color.txt',
+		'basin_ids': (14, 22, 23),
 	}		
 ]
 
@@ -211,7 +215,7 @@ class Job(th.Thread):
 
 	def __init__(self, tid, queue):
 		'''
-		Create a job with the given thread id, from configs in the queue.'
+		Create a job with the given thread id, from configs in the queu
 		'''
 		super(Job, self).__init__()
 		self.queue = queue;
@@ -305,38 +309,6 @@ def get_raster_value(ds, band, x, y):
 	r = int((y - trans[3]) / trans[5])
 	d = b.ReadAsArray(c, r, 1, 1)
 	return d[0,0]
-
-def get_position(x, y, zexag, height, raster):
-	'''
-	Calculate the model coordinate for nviz, which is 0-1 in x/y, from the 
-	southwest corner of the image.
-
-	TODO: This doesn't work. Not clear how it should.
-	'''
-	ds = gdal.Open(raster)
-	trans = ds.GetGeoTransform()
-	w = abs(ds.RasterXSize * trans[1])
-	h = abs(ds.RasterYSize * trans[5])
-	wx = abs(ds.RasterXSize * trans[1])
-	wy = abs(ds.RasterYSize * trans[5])
-	r = min(wx, wy)
-	range = 5000
-	range_offset = 2000
-	# Center position.
-	cx = trans[0] + (ds.RasterXSize / 2.) * trans[1]
-	cy = trans[3] + (ds.RasterYSize / 2.) * trans[5]
-	# Distance from center.
-	dx = (x - cx) * (1 if trans[1] > 0 else -1)
-	dy = (y - cy) * (1 if trans[5] > 0 else -1)
-	z = get_raster_value(ds, 1, x, y)
-	print(dx, dy, cx, cy, z)
-	px = math.atan2((r - z - height) * zexag, dx) / math.pi
-	py = math.atan2((r - z - height) * zexag, dy) / math.pi
-	print(px, py)
-	px = (px + range_offset) / range
-	py = (py + range_offset) / range
-	print(px, py)
-	return (px, py)
 
 def get_focus(x, y, z, raster):
 	'''
@@ -479,10 +451,10 @@ def render_scene(tid, elev, frame, frames, basin_name, basin_name_elev, out_tpl,
 	e = int(round(elev * 100.)) * int(round(elev_mult / 100.))
 
 	# Start, end position and focus.
-	pos0 = position[0]
-	pos1 = position[1]
 	foc0 = get_focus(focus[0][0], focus[0][1], focus[0][2], dem_file)
 	foc1 = get_focus(focus[1][0], focus[1][1], focus[1][2], dem_file)
+	pos0 = position[0]
+	pos1 = position[1]
 
 	# Load the connection lines.
 	spill_name = 'spill_{}'.format(tid)

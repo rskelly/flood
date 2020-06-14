@@ -61,7 +61,6 @@ as WKT linestrings) or to a spatial database.
 4) `$ make && sudo make install`
 
 Run `flood` to see a usage message.
-Flooding and connectivity app.
 
 ## Eye Candy
 
