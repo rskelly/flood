@@ -23,6 +23,10 @@ import threading as th
 import traceback as tb
 import psycopg2 as pg
 
+# Debug mode. Makes only the first and last images
+# in coarse mode and always overwrites.
+debug = False
+
 # Set to true to overwrite existing outputs. Otherwise, 
 # set to false and merely delete the images you want redone.
 overwrite = True
@@ -35,7 +39,7 @@ host = 'localhost'
 layer = 'spill_4m'
 
 # Rendermode. Coarse is useful for first-run checking.
-nviz_mode = 'coarse'#'fine' # 'coarse'
+nviz_mode = 'fine' if not debug else 'coarse'
 
 # Sequence of render jobs. The params are:
 # active: Set to true to run the job; false to ignore it.
@@ -77,7 +81,7 @@ sequences = [
 		'elev_mult': 10000., 
 		'size': (1920, 1080),
 		#'position': ((465087.273, 6525263.298), (465290.378, 6525676.061)), 
-		'position': ((.41, .455), (.42, .465)),
+		'position': ((.41, .455), (.41, .465)),
 		'height': 500,
 		'zexag': 2,
 		'focus': ((466488.145, 6525389.335, 250), (466488.145, 6525889.335, 200)),
@@ -87,7 +91,7 @@ sequences = [
 		'basin_ids': (16, 23)
 	},
 	{
-		'active': False,
+		'active': True,
 		'name': 'PAD 58/Lake 540',
 		'out_dir': '/home/rob/Desktop/ec/videos/pad58_lake540',
 		'out_pattern': '{e:d}_{n}',
@@ -101,7 +105,7 @@ sequences = [
 		'elev_step': 0.01,
 		'elev_mult': 10000., 
 		'size': (1920, 1080),
-		'position': ((.433, .5), (.437, .49)),
+		'position': ((.43, .5), (.435, .5)),
 		'height': 500,
 		'zexag': 2,
 		'focus': ((468002.823, 6521240.493, 250), (468261.619, 6521286.356, 200)),
@@ -149,7 +153,7 @@ sequences = [
 		'elev_step': 0.01,
 		'elev_mult': 10000., 
 		'size': (1920, 1080),
-		'position': ((.53, .48), (.51, .48)),
+		'position': ((.53, .48), (.52, .48)),
 		'height': 500,
 		'zexag': 2,
 		'focus': ((483692.060, 6521479.497, 200), (483692.060, 6521479.497, 200)),
@@ -173,7 +177,7 @@ sequences = [
 		'elev_step': 0.01,
 		'elev_mult': 10000., 
 		'size': (1920, 1080),
-		'position': ((.48, .51), (.49, .51)),
+		'position': ((.48, .51), (.49, .52)),
 		'height': 750,
 		'zexag': 2,
 		'focus': ((479883.281, 6517205.541, 200), (479883.281, 6517205.541, 200)),
@@ -197,7 +201,7 @@ sequences = [
 		'elev_step': 0.01,
 		'elev_mult': 10000., 
 		'size': (1920, 1080),
-		'position': ((.50, .50), (.49, .50)),
+		'position': ((.50, .505), (.49, .505)),
 		'height': 500,
 		'zexag': 2,
 		'focus': ((479237.519, 6520570.572, 200), (479237.519, 6520570.572, 200)),
@@ -273,6 +277,10 @@ def run():
 			jobs.append((elev, frame, frames, 'basin_{id}', 'basin_elev_{id}', out_tpl, steps, seq))
 			frame += spe
 			elev += step
+
+		# Keep the first and last for debugging.
+		if debug:
+			jobs = jobs[:spe] + jobs[-spe:]
 
 		# Run the jobs and wait for completion.
 		# Using threads here because the work happens native code and the GIL 
