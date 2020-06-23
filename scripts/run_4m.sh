@@ -6,9 +6,9 @@ dem=/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif
 seeds=v_poi.csv
 rdir=4m/r
 spill=4m/spill.csv
-estart=209
+estart=208
 eend=213
-estep=0.01
+estep=0.001
 minarea=10000
 maxdist=40
 
@@ -22,7 +22,7 @@ flood \
 	-dsi sid \
 	-dse elevation \
 	-dsm max_elevation \
-    -dsb bid1,bid2 \
+	-dsb bid1,bid2 \
 	-start $estart \
 	-end $eend \
 	-step $estep \

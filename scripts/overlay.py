@@ -8,16 +8,17 @@ import sys
 import os
 import math
 import cairo
+import multiprocessing as mp
 
 try:
-	in_file = sys.argv[1]
-	out_file = sys.argv[2]
-	ids = list(map(int, sys.argv[3].split(',')))
+    in_file = sys.argv[1]
+    out_file = sys.argv[2]
+    ids = list(map(int, sys.argv[3].split(',')))
 except:
-	print('Usage: <in file> <out file> <basin id,[basin id,[basin id,...]]>')
-	sys.exit(1)
+    print('Usage: <in file> <out file> <basin id,[basin id,[basin id,...]]>')
+    sys.exit(1)
 
-sky_file = '/home/rob/Desktop/ec/videos/sky/20190824_122718.jpg'
+sky_file = '/home/rob/Desktop/ec/videos/sky/201908font_size_122718.jpg'
 colour_file = 'color.txt'
 font = '/usr/share/fonts/type1/gsfonts/p052003l.pfb'
 
@@ -26,160 +27,203 @@ height = 50
 width = 300
 pad = 10
 
+font_size = 24
+
 # Basin ID->label mapping.
 panels = {
-	16: ('Horseshoe Slough',),
-	23: ('Peace/Athabasca/Slave River',),
-	18: ('PAD 58',),
-	17: ('Lake 540',),
-	21: ('Rocher Pond',),
-	7: ('Lake 50',),
-	9: ('Edward Lake',),
-	8: ('Flett Lake',),
-	12: ('Lake 565',),
-	11: ('Mud Lake/PAD5b',),
-	14: ('Lake 582',),
-	5: ('Jerry\'s Lake',),
-	6: ('Pushup Lake',),
-	15: ('S. Pushup Lake',),
-	4: ('W. Pushup Lake',),
-	19: ('Spruce I. Lk./PAD5')
-	7: ('Lake 50',),
-	13: ('Lake 577',),
-	20: ('Pete\'s Ck./PAD15',),
-	1: ('Egg Lk./PAD33',),
-	2: ('Egg Lake',),
-	3: ('Arden\'s Slough',)
+        16: ('Horseshoe Slough',),
+        23: ('Peace/Athabasca/Slave River',),
+        18: ('PAD 58',),
+        17: ('Lake 540',),
+        21: ('Rocher Pond',),
+        7: ('Lake 50',),
+        9: ('Edward Lake',),
+        8: ('Flett Lake',),
+        12: ('Lake 565',),
+        11: ('Mud Lake/PAD5b',),
+        14: ('Lake 582',),
+        5: ('Jerry\'s Lake',),
+        6: ('Pushup Lake',),
+        15: ('S. Pushup Lake',),
+        4: ('W. Pushup Lake',),
+        19: ('Spruce I. Lk./PAD5'),
+        13: ('Lake 577',),
+        20: ('Pete\'s Ck./PAD15',),
+        1: ('Egg Lk./PAD33',),
+        2: ('Egg Lake',),
+        3: ('Arden\'s Slough',)
 }
 
 def load_colours():
-	'''
-	Load the colours from the GRASS colour map.
-	Convert to float values.
-	'''
-	colours = {}
-	with open(colour_file, 'r') as f:
-		try:
-			while True:
-				i, c = f.readline().strip().split()
-				r, g, b = list(map(int, c.split(':')))
-				colours[int(i)] = (r / 255., g / 255., b / 255.)
-		except: pass
-	return colours
+    '''
+    Load the colours from the GRASS colour map.
+    Convert to float values.
+    '''
+    colours = {}
+    with open(colour_file, 'r') as f:
+        try:
+            while True:
+                i, c = f.readline().strip().split()
+                r, g, b = list(map(int, c.split(':')))
+                colours[int(i)] = (r / 255., g / 255., b / 255.)
+        except: pass
+    return colours
 
 def do_sky():
-	'''
-	Load and render the sky image. Looks pretty lame.
-	'''
+    '''
+    Load and render the sky image. Looks pretty lame.
+    '''
 
-	sky = Image.open(sky_file).convert(mode = 'RGBA')
-	im = Image.open(in_file).convert(mode = 'RGBA')
+    sky = Image.open(sky_file).convert(mode = 'RGBA')
+    im = Image.open(in_file).convert(mode = 'RGBA')
 
-	ic, ir = im.size
+    ic, ir = im.size
 
-	sky0 = sky.resize(im.size)
+    sky0 = sky.resize(im.size)
 
-	idata = im.getdata()
-	idata0 = []
+    idata = im.getdata()
+    idata0 = []
 
-	for r, g, b, a in idata:
-		if r == 255 and g == 255 and b == 255:
-			idata0.append((255, 255, 255, 0))
-		else:
-			idata0.append((r, g, b, 255))
+    for r, g, b, a in idata:
+        if r == 255 and g == 255 and b == 255:
+            idata0.append((255, 255, 255, 0))
+        else:
+            idata0.append((r, g, b, 255))
 
-	im.putdata(idata0)
+    im.putdata(idata0)
 
-	comp = Image.alpha_composite(sky0, im)
-	comp.save(out_file, 'PNG')
+    comp = Image.alpha_composite(sky0, im)
+    comp.save(out_file, 'PNG')
 
 def basin_panel(ctx, name, width, height, pad, colour):
-	'''
-	Print a legend item for a basin with the colour and name.
-	'''
+    '''
+    Print a legend item for a basin with the colour and name.
+    '''
 
-	# Background.
-	ctx.move_to(0, 0)
-	ctx.rectangle(0, 0, width, height)
-	ctx.set_source_rgba(1, 1, 1, 0.75)
-	ctx.fill()
+    # Background.
+    ctx.move_to(0, 0)
+    ctx.rectangle(0, 0, width, height)
+    ctx.set_source_rgba(1, 1, 1, 0.75)
+    ctx.fill()
 
-	# Colour swatch.
-	ctx.rectangle(pad, pad, height - pad * 2, height - pad * 2)
-	ctx.set_source_rgb(*colour)
-	ctx.fill();
+    # Colour swatch.
+    ctx.rectangle(pad, pad, height - pad * 2, height - pad * 2)
+    ctx.set_source_rgb(*colour)
+    ctx.fill();
 
-	# Stroke border.
-	ctx.rectangle(pad, pad, height - pad * 2, height - pad * 2)
-	ctx.set_source_rgb(0, 0, 0)
-	ctx.set_line_width(1)
-	ctx.stroke()
+    # Stroke border.
+    ctx.rectangle(pad, pad, height - pad * 2, height - pad * 2)
+    ctx.set_source_rgb(0, 0, 0)
+    ctx.set_line_width(1)
+    ctx.stroke()
 
-	# Text
-	ctx.move_to(height, height / 2 + pad)
-	ctx.set_font_size(24)
-	ctx.set_source_rgb(0, 0, 0)
-	ctx.show_text(name)
+    # Text
+    ctx.move_to(height, height / 2 + pad)
+    ctx.set_font_size(font_size)
+    ctx.set_source_rgb(0, 0, 0)
+    ctx.show_text(name)
 
 def elev_panel(ctx, elev, width, height, pad):
-	'''
-	Add a legend item for the elevation.
-	'''
+    '''
+    Add a legend item for the elevation.
+    '''
 
-	# Background.
-	ctx.move_to(0, 0)
-	ctx.rectangle(0, 0, width, height)
-	ctx.set_source_rgba(1, 1, 1, 0.75)
-	ctx.fill()
+    # Background.
+    ctx.move_to(0, 0)
+    ctx.rectangle(0, 0, width, height)
+    ctx.set_source_rgba(1, 1, 1, 0.75)
+    ctx.fill()
 
-	# Format the label, get its extent.
-	t = '{}: {:.2f}m'.format('Elevation', elev)
-	te = ctx.text_extents(t)
+    # Format the label, get its extent.
+    t = '{}: {:.2f}m'.format('Elevation', elev)
+    te = ctx.text_extents(t)
 
-	# Render text in center.
-	ctx.move_to(width / 2 - te.width / 2, height / 2 + pad)
-	ctx.set_font_size(24)
-	ctx.set_source_rgb(0, 0, 0)
-	ctx.show_text(t)
+    # Render text in center.
+    ctx.move_to(width / 2 - te.width / 2, height / 2 + pad)
+    ctx.set_font_size(font_size)
+    ctx.set_source_rgb(0, 0, 0)
+    ctx.show_text(t)
 
-def run(infile, outfile, img):
-	'''
-	Process the image.
-	'''
+def text_width(ctx, ids):
+    '''
+    Get the maximum text width for each of the panel names, given the id list.
+    '''
+    ctx.set_font_size(font_size)
+    w = width
+    for id_ in ids:
+        w = max(w, ctx.text_extents(panels[id_][0]).width)
+    return w
 
-	# Get the elevation from the filename.
-	f = os.path.basename(infile)
-	e = int(round(float(f[:7]) / 100.)) / 100.
+def job(infiles, outdir, ids):
+    '''
+    Process the image.
+    '''
+    # Load the colours
+    colours = load_colours()
 
-	# Load the colours
-	colours = load_colours()
+    for infile in infiles:
 
-	# If the image is not a png convert it as a tmp.
-	tmp = None
-	if not infile.lower().endswith('.png'):
-		tmp = '/tmp/_overlay.png'
-		os.system('convert {} {}'.format(infile, tmp))
-		infile = tmp
+        print('Processing', infile)
 
-	# Initialize the image and context.
-	inimg = cairo.ImageSurface.create_from_png(infile)
-	ctx = cairo.Context(inimg)
+        # Rearrange numbers to make ordering easier.
+        parts = os.path.splitext(os.path.basename(infile))[0].split('_')
+        outfile = os.path.join(outdir, '{}_{}.{}'.format(parts[0], parts[1], 'png'))
+        if os.path.exists(outfile) and os.stat(outfile).st_size > 0:
+            continue
 
-	# Translate to start the panel drawing in the bottom left.
-	ctx.translate(height / 2, inimg.get_height() - len(panels) * height - pad * 2)
+        # Get the elevation from the filename.
+        f = os.path.basename(infile)
+        e = int(round(float(f[:7]) / 100.)) / 100.
 
-	# Do the legend panels.
-	for id_ in ids:
-		name, = panels[id_]
-		colour = colours[id_]
-		basin_panel(ctx, name, width, height, pad, colour)
-		ctx.translate(0, height)
+        # If the image is not a png convert it as a tmp.
+        tmp = '/tmp/overlay_{}.png'.format(os.getpid())
+        if not infile.lower().endswith('.png'):
+            os.system('convert {} {}'.format(infile, tmp))
+            infile = tmp
 
-	# Do the elevation panel.
-	elev_panel(ctx, e, width, height, pad)
+        # Initialize the image and context.
+        inimg = cairo.ImageSurface.create_from_png(infile)
+        ctx = cairo.Context(inimg)
 
-	# Write.
-	inimg.write_to_png(outfile)
+        # Get the maximum text width.
+        tw = text_width(ctx, ids) + height + pad
+    
+        # Translate to start the panel drawing in the bottom left.
+        ctx.translate(height / 2, inimg.get_height() - (len(ids) + 1) * height - height / 2)
+
+        # Do the legend panels.
+        for id_ in ids:
+            name, = panels[id_]
+            colour = colours[id_]
+            basin_panel(ctx, name, tw, height, pad, colour)
+            ctx.translate(0, height)
+
+        # Do the elevation panel.
+        elev_panel(ctx, e, tw, height, pad)
+
+        # Write.
+        inimg.write_to_png(outfile)
+
+def run(indir, outdir, ids):
+
+    print('Spawning processes')
+
+    mp.set_start_method('spawn')
+
+    files = []
+    for f in [x for x in os.listdir(indir) if x.endswith('.ppm')]:
+        files.append(os.path.join(indir, f))
+
+    ts = 4
+    procs = []
+    for t in range(ts):
+        files_ = files[t * int(len(files) / 4):(t+1) * int(len(files) / 4)]
+        procs.append(mp.Process(target = job, args = (files_, outdir, ids)))
+        procs[t].start()
+
+    for t in range(ts):
+        procs[t].join()
 
 if __name__ == '__main__':
-	run(in_file, out_file, ids)
+    run(in_file, out_file, ids)
+
