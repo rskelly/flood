@@ -64,6 +64,6 @@ Run `flood` to see a usage message.
 
 ## Eye Candy
 
-[![Youtube Video](https://img.youtube.com/vi/442tqEhA4fk/0.jpg)](https://youtu.be/442tqEhA4fk)]
+[![Youtube Video](https://img.youtube.com/vi/442tqEhA4fk/0.jpg)](https://youtu.be/442tqEhA4fk)
 
 Click image to view on Youtube.
