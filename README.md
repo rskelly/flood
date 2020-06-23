@@ -45,7 +45,7 @@ will "flood" each elevation, step-by-step, from the start to the end (inclusive)
 
 The default output is a series of integer rasters, one for each elevation, containing the 
 delinated basins. The pixel values are the IDs of the original seeds. Optionally, basins 
-can be vectorized and output to files or a spatial database, though this step can be time-
+can be vectorized and output to files or a spatial database (PostGIS), though this step can be time-
 consuming.
 
 Spill points and path geometries can be output to a CSV file (with line geometries represented
@@ -64,4 +64,6 @@ Run `flood` to see a usage message.
 
 ## Eye Candy
 
-*Soon*
+[![Youtube Video](https://img.youtube.com/vi/442tqEhA4fk/0.jpg)](https://youtu.be/442tqEhA4fk)
+
+Click image to view on Youtube.
