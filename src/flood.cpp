@@ -56,26 +56,29 @@ namespace {
 	}
 
 
-	void worker(Flood* config, std::queue<float>* elevations) {
+	void worker(Flood* config, std::queue<int>* elevations) {
 
 		while(!config->cancel) {
-			float elevation;
+			int elev;
 			{
 				std::lock_guard<std::mutex> lk(config->qmtx());
 				if(elevations->empty()) {
 					break;
 				} else {
-					elevation = elevations->front();
+					elev = elevations->front();
 					elevations->pop();
 				}
 			}
 			if(config->cancel)
 				break;
 
+			float p = std::pow(10, config->precision());
+			float elevation = elev / p;
+
 			g_debug("Filling to " << elevation << " by step " << config->step());
 
 			// The basin filename.
-			std::string rfile = config->basinOutput().rasterFile(elevation);
+			std::string rfile = config->basinOutput().rasterFile(elev);
 
 			// Do not overwite if not required.
 			if(!config->overwrite() && geo::util::isfile(rfile))
@@ -301,10 +304,11 @@ SpillPoint::~SpillPoint() {
 Flood::Flood(const std::string& input, int band, bool overwrite,
 		BasinOutput* basinOutput, SpillOutput* spillOutput,
 		const std::string& seeds,
-		float start, float end, float step,
+		float start, float end, float step, int precision,
 		float minBasinArea, float maxSpillDist,
 		const std::vector<BreakLine>& breakLines) :
 			m_start(start), m_end(end), m_step(step),
+			m_precision(precision),
 			m_minBasinArea(minBasinArea),
 			m_maxSpillDist(maxSpillDist),
 			m_t(1),
@@ -396,6 +400,10 @@ const std::string& Flood::seedsFile() const {
 
 float Flood::start() const {
 	return m_start;
+}
+
+int Flood::precision() const {
+	return m_precision;
 }
 
 float Flood::end() const {
@@ -617,7 +625,7 @@ void Flood::flood(int numThreads) {
 	g_debug("Flooding...");
 
 	std::list<std::thread> threads;
-	std::queue<float> elevations;
+	std::queue<int> elevations;
 
 	init();
 
@@ -630,7 +638,8 @@ void Flood::flood(int numThreads) {
 		findMinima();
 	}
 
-	for(float e = start(); e <= end(); e += step())
+	float p = std::pow(10, precision());
+	for(int e = (int) (start() * p); e <= (int) (end() * p); e += (int) (step() * p))
 		elevations.push(e);
 
 	cancel = false;
