@@ -13,6 +13,7 @@
 
 #include "flood.hpp"
 
+using namespace geo::flood;
 using namespace geo::flood::util;
 using namespace geo::grid;
 using namespace geo::ds;
@@ -52,6 +53,63 @@ namespace {
 			data = true;
 		}
 		return data;
+	}
+
+
+	void worker(Flood* config, std::queue<float>* elevations) {
+
+		while(!config->cancel) {
+			float elevation;
+			{
+				std::lock_guard<std::mutex> lk(config->qmtx());
+				if(elevations->empty()) {
+					break;
+				} else {
+					elevation = elevations->front();
+					elevations->pop();
+				}
+			}
+			if(config->cancel)
+				break;
+
+			g_debug("Filling to " << elevation << " by step " << config->step());
+
+			// The basin filename.
+			std::string rfile = config->basinOutput().rasterFile(elevation);
+
+			// Do not overwite if not required.
+			if(!config->overwrite() && geo::util::isfile(rfile))
+				continue;
+
+			// Set up the output raster.
+			GridProps props(config->dem().props());
+			props.setBands(1);
+			props.setNoData(0);
+			props.setDataType(DataType::UInt32);
+			props.setWritable(true);
+			props.setCompress(true);
+
+			Band<int> basinRaster(rfile, props);
+
+			// Generate basins.
+			int basins = config->fillBasins(basinRaster, elevation);
+
+			basinRaster.flush();
+
+			// Find and output spill points.
+			if (basins > 1 && config->findSpillPoints(basinRaster, elevation) > 0) {
+				config->spillOutput().saveSpillPoints(config->dem(), config->spillPoints());
+			}
+
+			g_debug("Writing basin raster " << rfile);
+
+			basinRaster.flush();
+
+			// If desired, generate vectors.
+			if (basins > 0)
+				config->basinOutput().saveVectors(basinRaster, elevation);
+		}
+
 	}
 
 } // anon
@@ -240,9 +298,7 @@ SpillPoint::~SpillPoint() {
 }
 
 
-using namespace geo::flood;
-
-Flood::Flood(const std::string& input, int band,
+Flood::Flood(const std::string& input, int band, bool overwrite,
 		BasinOutput* basinOutput, SpillOutput* spillOutput,
 		const std::string& seeds,
 		float start, float end, float step,
@@ -253,6 +309,7 @@ Flood::Flood(const std::string& input, int band,
 			m_maxSpillDist(maxSpillDist),
 			m_t(1),
 			m_band(band),
+			m_overwrite(overwrite),
 			m_basinOutput(basinOutput),
 			m_spillOutput(spillOutput),
 			m_input(input),
@@ -315,6 +372,10 @@ Flood::~Flood() {
 
 std::mutex& Flood::qmtx() {
 	return m_qmtx;
+}
+
+bool Flood::overwrite() const {
+	return m_overwrite;
 }
 
 const std::string& Flood::input() const {
@@ -547,58 +608,6 @@ void Flood::findMinima() {
 				m_seeds.emplace_back(0, 0, c, r, m_dem.get(c, r), 0);
 		}
 	}
-}
-
-void worker(Flood* config, std::queue<float>* elevations) {
-
-	while(!config->cancel) {
-		float elevation;
-		{
-			std::lock_guard<std::mutex> lk(config->qmtx());
-			if(elevations->empty()) {
-				break;
-			} else {
-				elevation = elevations->front();
-				elevations->pop();
-			}
-		}
-		if(config->cancel)
-			break;
-
-		g_debug("Filling to " << elevation << " by step " << config->step());
-
-		// The basin filename.
-		std::string rfile = config->basinOutput().rasterFile(elevation);
-
-		// Set up the output raster.
-		GridProps props(config->dem().props());
-		props.setBands(1);
-		props.setNoData(0);
-		props.setDataType(DataType::UInt32);
-		props.setWritable(true);
-		props.setCompress(true);
-
-		Band<int> basinRaster(rfile, props);
-
-		// Generate basins.
-		int basins = config->fillBasins(basinRaster, elevation);
-
-		basinRaster.flush();
-
-		// Find and output spill points.
-		if (basins > 1 && config->findSpillPoints(basinRaster, elevation) > 0) {
-			config->spillOutput().saveSpillPoints(config->dem(), config->spillPoints());
-		}
-
-		g_debug("Writing basin raster " << rfile);
-
-		basinRaster.flush();
-
-		// If desired, generate vectors.
-		if (basins > 0)
-			config->basinOutput().saveVectors(basinRaster, elevation);
-	}
-
 }
 
 void Flood::flood(int numThreads) {
