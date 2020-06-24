@@ -56,7 +56,8 @@ void usage() {
 			<< " -bl    Add a break line of the specified height. In the form <x0,y0,x1,y1,height>.\n"
 			<< " -o     If given, each elevation will be computed even if raster file exists.\n"
 			<< "        Otherwise, the elevation will be skipped.\n"
-			<< " -a     The source raster band. Default 1.\n";
+			<< " -a     The source raster band. Default 1.\n"
+			<< " -c     The precision; the number of decimal places to use. Default 3.\n";
 }
 
 using namespace geo::flood;
@@ -77,6 +78,7 @@ int main(int argc, char **argv) {
 	double minBasinArea = 100.0;
 	int t = 1;
 	int band = 1;
+	int precision = 3;
 	bool overwrite = false;
 	std::vector<geo::flood::BreakLine> breakLines;
 	SpillOutput* spillOutput;
@@ -122,6 +124,8 @@ int main(int argc, char **argv) {
 			overwrite = true;
 		} else if (a == "-a") {
 			band = atoi(argv[++i]);
+		} else if (a == "-c") {
+			precision = atoi(argv[++i]);
 		} else if (a == "-bl") {
 			std::vector<std::string> list;
 			geo::util::split(std::back_inserter(list), argv[++i], ",");
@@ -182,8 +186,9 @@ int main(int argc, char **argv) {
 	}
 
 	try {
-		Flood config(input, band, overwrite, basinOutput, spillOutput, seeds, start, end,
-			step, minBasinArea, maxSpillDist, breakLines);
+		Flood config(input, band, overwrite, basinOutput, spillOutput, seeds,
+			start, end, step, precision,
+			minBasinArea, maxSpillDist, breakLines);
 		config.flood(t);
 	} catch (const std::exception &e) {
 		std::cerr << e.what() << "\n";

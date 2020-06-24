@@ -7,9 +7,7 @@
 
 #include "flood.hpp"
 
-
 using namespace geo::flood::util;
-
 
 heuristic::heuristic(Band<float>* dem) :
 	dem(dem) {
@@ -44,9 +42,9 @@ void BasinOutput::prepare() {
 		throw std::runtime_error("Raster output directory does not exist and could not be created.");
 }
 
-std::string BasinOutput::rasterFile(float elevation) const {
+std::string BasinOutput::rasterFile(int elevation) const {
 	std::stringstream ss;
-	ss << rdir << "/" << (int) (elevation * 10000) << ".tif";
+	ss << rdir << "/" << elevation << ".tif";
 	return ss.str();
 }
 

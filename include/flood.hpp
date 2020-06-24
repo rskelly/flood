@@ -399,10 +399,10 @@ namespace geo {
 				/**
 				 * \brief Return the path of the file for saving basins corresponding to the given elevation.
 				 *
-				 * \param elevation The flood elevation.
+				 * \param elevation The flood elevation multiplied by the global multiplier.
 				 * \return The path of the file for saving basins corresponding to the given elevation.
 				 */
-				std::string rasterFile(float elevation) const;
+				std::string rasterFile(int elevation) const;
 
 				virtual ~BasinOutput() {}
 			};
@@ -588,6 +588,7 @@ namespace geo {
 			float m_start;								///<! The start elevation.
 			float m_end;								///<! The end elevation (inclusive).
 			float m_step;								///<! The elevation step.
+			int m_precision;							///<! The precision; the number of decimal places to use.
 			float m_minBasinArea;						///<! Ignore basins smaller than this.
 			float m_maxSpillDist;						///<! Ignore spill paths longer than this (as the crow flies).
 			int m_t; 									///<! Number of threads
@@ -620,6 +621,7 @@ namespace geo {
 			 * \param start The starting elevation.
 			 * \param end The ending elevation.
 			 * \param step The step elevation.
+			 * \param precision The number of decimal places to use.
 			 * \param minBasinArea The minimum area of a region to be considered a basing for connectivity purposes.
 			 * \param maxSpillDist The maximum distance between two basins before they are suspected of connecting.
 			 * \param breakLines A list of breaklines to apply to the input raster.
@@ -627,7 +629,7 @@ namespace geo {
 			Flood(const std::string& input, int band, bool overwrite,
 					BasinOutput* basinOutput, SpillOutput* spillOutput,
 					const std::string& seeds,
-					float start, float end, float step,
+					float start, float end, float step, int precision,
 					float minBasinArea, float maxSpillDist,
 					const std::vector<BreakLine>& breakLines);
 
@@ -651,6 +653,15 @@ namespace geo {
 			 * \return True if elevation should be re-computed regardless of existence of raster file.
 			 */
 			bool overwrite() const;
+
+			/**
+			 * \breif The number of decimal places to use for elevations.
+			 *
+			 * Raster filenames will use and integer given by the elevation value multiplied by 10^precision.
+			 *
+			 * \return The precision.
+			 */
+			int precision() const;
 
 			/**
 			 * \brief Return the input DEM file.
