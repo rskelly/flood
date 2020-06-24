@@ -592,6 +592,7 @@ namespace geo {
 			float m_maxSpillDist;						///<! Ignore spill paths longer than this (as the crow flies).
 			int m_t; 									///<! Number of threads
 			int m_band;									///<! The source band in the DEM.
+			bool m_overwrite;							///<! If false skip computation if the raster file exists.
 			Band<float> m_dem;							///<! The DEM.
 			BasinOutput* m_basinOutput;					///<! The basin output object.
 			SpillOutput* m_spillOutput;					///<! The spill point output object.
@@ -612,6 +613,7 @@ namespace geo {
 			 *
 			 * \param input The DEM file.
 			 * \param band Input raster band.
+			 * \param overwrite If false, do not compute elevation if raster file exists.
 			 * \param output Configuration for file/DB/etc. output.
 			 * \param spill The spill points file. CSV or SHP.
 			 * \param seeds The seeds file. CSV.
@@ -622,7 +624,7 @@ namespace geo {
 			 * \param maxSpillDist The maximum distance between two basins before they are suspected of connecting.
 			 * \param breakLines A list of breaklines to apply to the input raster.
 			 */
-			Flood(const std::string& input, int band,
+			Flood(const std::string& input, int band, bool overwrite,
 					BasinOutput* basinOutput, SpillOutput* spillOutput,
 					const std::string& seeds,
 					float start, float end, float step,
@@ -642,6 +644,13 @@ namespace geo {
 			void validateInputs();
 
 			~Flood();
+
+			/**
+			 * \brief If false, do not compute elevation if raster file exists.
+			 *
+			 * \return True if elevation should be re-computed regardless of existence of raster file.
+			 */
+			bool overwrite() const;
 
 			/**
 			 * \brief Return the input DEM file.
