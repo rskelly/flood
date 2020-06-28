@@ -72,8 +72,8 @@ namespace {
 			if(config->cancel)
 				break;
 
-			float p = std::pow(10, config->precision());
-			float elevation = elev / p;
+			int p = std::pow(10, config->precision());
+			float elevation = (float) elev / p;
 
 			g_debug("Filling to " << elevation << " by step " << config->step());
 
@@ -304,7 +304,7 @@ SpillPoint::~SpillPoint() {
 Flood::Flood(const std::string& input, int band, bool overwrite,
 		BasinOutput* basinOutput, SpillOutput* spillOutput,
 		const std::string& seeds,
-		float start, float end, float step, int precision,
+		int start, int end, int step, int precision,
 		float minBasinArea, float maxSpillDist,
 		const std::vector<BreakLine>& breakLines) :
 			m_start(start), m_end(end), m_step(step),
@@ -327,16 +327,19 @@ void Flood::validateInputs() {
 	g_debug("Checking...");
 
 	if(m_start > m_end)
-		throw std::runtime_error("End elevation must be larger than start.");
+		g_runerr("End elevation must be larger than start.");
 
 	if(m_step <= 0)
-		throw std::runtime_error("Step must be greater than zero.");
+		g_runerr("Step must be greater than zero.");
+
+	if(m_precision <= 0)
+		g_runerr("Precision must be >0.");
 
 	if(m_minBasinArea < 0)
-		throw std::runtime_error("Minimum basin area must be greater than or equal to zero.");
+		g_runerr("Minimum basin area must be greater than or equal to zero.");
 
 	if(m_maxSpillDist <= 0)
-		throw std::runtime_error("Maximum spill distance must be larger than zero.");
+		g_runerr("Maximum spill distance must be larger than zero.");
 
 	if (!m_basinOutput || m_basinOutput->valid())
 		g_warn("The basin output configuration is not valid.");
@@ -352,19 +355,19 @@ void Flood::validateInputs() {
 
 	int threads = std::thread::hardware_concurrency();
 	if(m_t < 1)
-		throw std::runtime_error("Threads must be greater than zero.");
+		g_runerr("Threads must be greater than zero.");
 
 	if(threads > 0 && m_t > threads)
-		throw std::runtime_error("Threads must be less than or equal to the number of available cores.");
+		g_runerr("Threads must be less than or equal to the number of available cores.");
 
 	if(m_input.empty())
-		throw std::runtime_error("Input raster not given.");
+		g_runerr("Input raster not given.");
 
 	if(!isfile(m_input))
-		throw std::runtime_error("Input raster not found.");
+		g_runerr("Input raster not found.");
 
 	if(!m_fseeds.empty() && !isfile(m_fseeds))
-		throw std::runtime_error("Seeds file does not exist.");
+		g_runerr("Seeds file does not exist.");
 
 	m_basinOutput->prepare();
 	m_spillOutput->prepare();
@@ -398,7 +401,7 @@ const std::string& Flood::seedsFile() const {
 	return m_fseeds;
 }
 
-float Flood::start() const {
+int Flood::start() const {
 	return m_start;
 }
 
@@ -406,11 +409,11 @@ int Flood::precision() const {
 	return m_precision;
 }
 
-float Flood::end() const {
+int Flood::end() const {
 	return m_end;
 }
 
-float Flood::step() const {
+int Flood::step() const {
 	return m_step;
 }
 
@@ -473,16 +476,10 @@ void Flood::init() {
 
 	g_debug("Computing stats...");
 	const GridStats stats = m_dem.stats();
-	if (std::isnan(m_start)) {
-		m_start = stats.min;
-	} else {
-		m_start = geo::max((float) stats.min, m_start);
-	}
-	if (std::isnan(m_end)) {
-		m_end = stats.max;
-	} else {
-		m_end = geo::min((float) stats.max, m_end);
-	}
+	int p = std::pow(10, m_precision);
+	m_start = geo::max((int) (stats.min * p), m_start);
+	m_end = geo::min((int) (stats.max * p), m_end);
+
 	g_debug("Stats: " << stats.min << ", " << stats.max);
 	if (m_end < m_start)
 		g_argerr("The ending elevation must be larger than the starting elevation: " << m_start << ", " << m_end);
@@ -638,8 +635,7 @@ void Flood::flood(int numThreads) {
 		findMinima();
 	}
 
-	float p = std::pow(10, precision());
-	for(int e = (int) (start() * p); e <= (int) (end() * p); e += (int) (step() * p))
+	for(int e = start(); e <= end(); e += step())
 		elevations.push(e);
 
 	cancel = false;
