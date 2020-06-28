@@ -29,7 +29,7 @@ debug = False
 
 # Set to true to overwrite existing outputs. Otherwise,
 # set to false and merely delete the images you want redone.
-overwrite = True
+overwrite = False
 
 # Database connection parameters for vectors.
 dbname = 'ec'
@@ -54,7 +54,7 @@ nviz_mode = 'fine' if not debug else 'coarse'
 # rgb_name: A GRASS name for the orthophoto (colour bands will be composited).
 # elev_range: The start and end elevations. Must correspond to the basin file names.
 # elev_step: The elevation step.
-# elev_mult: A multiplier for the elevation to produce the value used in basin file names.
+# precision: The precision of elevations. Each configured elev is the real elev * 10^precision.
 # size: The size of the output images.
 # position: The position of the viewer above the model in model coordinates at start and end. Will be graduated.
 # height: The height of the viewer above the model.
@@ -68,7 +68,7 @@ nviz_mode = 'fine' if not debug else 'coarse'
 # basin_ids: The basin IDs of interest. Determines the loading of spill paths.
 sequences = [
         {
-                'active': True,
+                'active': False,
                 'name': 'Horseshoe Slough',
                 'out_dir': '/home/rob/Desktop/ec/videos/horseshoe_slough',
                 'out_pattern': '{e}_{n}',
@@ -78,9 +78,9 @@ sequences = [
                 'dem_name': 'pad_dem_4m',
                 'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
                 'rgb_name': 'pad_ortho',
-                'elev_range': (209.5, 211.),
-                'elev_step': 0.001,
-                'elev_mult': 10000.,
+                'elev_range': (209500, 211000),
+                'elev_step': 1,
+                'precision': 3,
                 'size': (1920, 1080),
                 'position': ((464641.750,6524696.567), (465237.964,6525004.502)),
                 'height': 500,
@@ -94,7 +94,7 @@ sequences = [
                 'basin_ids': (16, 23)
         },
         {
-                'active': True,
+                'active': False,
                 'name': 'PAD 58/Lake 540',
                 'out_dir': '/home/rob/Desktop/ec/videos/pad58_lake540',
                 'out_pattern': '{e}_{n}',
@@ -104,9 +104,9 @@ sequences = [
                 'dem_name': 'pad_dem_4m',
                 'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
                 'rgb_name': 'pad_ortho',
-                'elev_range': (209.5, 212),
-                'elev_step': 0.001,
-                'elev_mult': 10000.,
+                'elev_range': (209500, 212000),
+                'elev_step': 1,
+                'precision': 3,
                 'size': (1920, 1080),
                 'position': ((467267.384,6519997.290), (466749.792,6519387.972)),
                 'height': 500,
@@ -120,7 +120,7 @@ sequences = [
                 'basin_ids': (17, 18, 23)
         },
         {
-                'active': True,
+                'active': False,
                 'name': 'Lake 50',
                 'out_dir': '/home/rob/Desktop/ec/videos/lake50',
                 'out_pattern': '{e}_{n}',
@@ -130,9 +130,9 @@ sequences = [
                 'dem_name': 'pad_dem_4m',
                 'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
                 'rgb_name': 'pad_ortho',
-                'elev_range': (208.5, 211.5),
-                'elev_step': 0.001,
-                'elev_mult': 10000.,
+                'elev_range': (208500, 210000),
+                'elev_step': 1,
+                'precision': 3,
                 'size': (1920, 1080),
                 'position': ((482326.692,6522888.271), (481088.402,6522431.283)),
                 'height': 500,
@@ -146,7 +146,7 @@ sequences = [
                 'basin_ids': (7, 21, 23),
         },
         {
-                'active': True,
+                'active': False,
                 'name': 'PAD 37 - Rocher Pond',
                 'out_dir': '/home/rob/Desktop/ec/videos/pad37',
                 'out_pattern': '{e}_{n}',
@@ -156,9 +156,9 @@ sequences = [
                 'dem_name': 'pad_dem_4m',
                 'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
                 'rgb_name': 'pad_ortho',
-                'elev_range': (209.0, 210.3),
-                'elev_step': 0.001,
-                'elev_mult': 10000.,
+                'elev_range': (209000, 210300),
+                'elev_step': 1,
+                'precision': 3,
                 'size': (1920, 1080),
                 'position': ((484745.944,6521523.859), (484647.667,6521530.410)),
                 'height': 500,
@@ -172,7 +172,7 @@ sequences = [
                 'basin_ids': (7, 21, 23),
         },
         {
-                'active': True,
+                'active': False,
                 'name': 'PAD 5b - Mud Lake',
                 'out_dir': '/home/rob/Desktop/ec/videos/pad5b',
                 'out_pattern': '{e}_{n}',
@@ -182,9 +182,9 @@ sequences = [
                 'dem_name': 'pad_dem_4m',
                 'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
                 'rgb_name': 'pad_ortho',
-                'elev_range': (208.5, 210.5),
-                'elev_step': 0.001,
-                'elev_mult': 10000.,
+                'elev_range': (208500, 210500),
+                'elev_step': 1,
+                'precision': 3,
                 'size': (1920, 1080),
                 'position': ((478393.975,6516564.147), (478459.493,6516485.526)),
                 'height': 750,
@@ -198,7 +198,7 @@ sequences = [
                 'basin_ids': (11, 14, 5, 15, 23),
         },
         {
-                'active': True,
+                'active': False,
                 'name': 'Lake 582',
                 'out_dir': '/home/rob/Desktop/ec/videos/lake582',
                 'out_pattern': '{e}_{n}',
@@ -208,9 +208,9 @@ sequences = [
                 'dem_name': 'pad_dem_4m',
                 'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
                 'rgb_name': 'pad_ortho',
-                'elev_range': (208.5, 210.0),
-                'elev_step': 0.001,
-                'elev_mult': 10000.,
+                'elev_range': (208500, 210000),
+                'elev_step': 1,
+                'precision': 3,
                 'size': (1920, 1080),
                 'position': ((478810.014,6520457.553), (478652.771,6520791.695)),
                 'height': 500,
@@ -224,7 +224,7 @@ sequences = [
                 'basin_ids': (14, 22, 23),
         },
         {
-                'active': True,
+                'active': False,
                 'name': 'Edwards Lake',
                 'out_dir': '/home/rob/Desktop/ec/videos/edwards_lk',
                 'out_pattern': '{e}_{n}',
@@ -234,9 +234,9 @@ sequences = [
                 'dem_name': 'pad_dem_4m',
                 'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
                 'rgb_name': 'pad_ortho',
-                'elev_range': (209., 210.5),
-                'elev_step': 0.001,
-                'elev_mult': 10000.,
+                'elev_range': (209000, 210500),
+                'elev_step': 1,
+                'precision': 3,
                 'size': (1920, 1080),
                 'position': ((479897.613,6509537.344), (478705.186,6509275.272)),
                 'height': 500,
@@ -250,7 +250,7 @@ sequences = [
                 'basin_ids': (9, 8, 22, 23),
         },
         {
-                'active': True,
+                'active': False,
                 'name': 'Flett Lake',
                 'out_dir': '/home/rob/Desktop/ec/videos/flett_lk',
                 'out_pattern': '{e}_{n}',
@@ -260,9 +260,9 @@ sequences = [
                 'dem_name': 'pad_dem_4m',
                 'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
                 'rgb_name': 'pad_ortho',
-                'elev_range': (209., 210.5),
-                'elev_step': 0.001,
-                'elev_mult': 10000.,
+                'elev_range': (209000, 210500),
+                'elev_step': 1,
+                'precision': 3,
                 'size': (1920, 1080),
                 'position': ((482053.155,6510726.495), (482990.062,6511499.607)),
                 'height': 500,
@@ -286,9 +286,9 @@ sequences = [
                 'dem_name': 'pad_dem_4m',
                 'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
                 'rgb_name': 'pad_ortho',
-                'elev_range': (209.5, 210.5),
-                'elev_step': 0.001,
-                'elev_mult': 10000.,
+                'elev_range': (209500, 210500),
+                'elev_step': 1,
+                'precision': 3,
                 'size': (1920, 1080),
                 'position': ((479301.399,6515633.792), (478927.947,6513609.286)),
                 'height': 500,
@@ -312,9 +312,9 @@ sequences = [
                 'dem_name': 'pad_dem_4m',
                 'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
                 'rgb_name': 'pad_ortho',
-                'elev_range': (209.5, 210.5),
-                'elev_step': 0.001,
-                'elev_mult': 10000.,
+                'elev_range': (209500, 210500),
+                'elev_step': 1,
+                'precision': 3,
                 'size': (1920, 1080),
                 'position': ((477833.796,6522251.108), (477689.657,6521759.723)),
                 'height': 500,
@@ -376,10 +376,10 @@ def run():
         load_basemap(**seq)
 
         # Prepare start, end and counters.
-        elev, elev_end = list(map(float, seq['elev_range']))
-        step = float(seq['elev_step'])
-        steps = int(math.ceil((elev_end - elev) / step))
-        spe = int(seq['steps_per_elev'])
+        elev, elev_end = seq['elev_range']
+        step = seq['elev_step']
+        steps = int(math.ceil(float(elev_end - elev) / step))
+        spe = seq['steps_per_elev']
 
         # Prepare the output file template.
         out_tpl = os.path.join(seq['out_dir'], seq['out_pattern'])
@@ -410,20 +410,21 @@ def run():
         for i in range(numthreads):
             threads[i].join()
 
-def e_to_filename(elev, elev_mult, elev_step):
+def e_to_filename(elev, precision, elev_step):
     '''
     Convert the elevation to a filename-ready string. Need the multiplier
     and step value to fix the precision.
     '''
-    es = int(1. / elev_step)
-    return str(int(round(elev * es) * (elev_mult / es)))
+    #es = int(1. / elev_step)
+    #return str(int(round(elev * es) * (precision / es)))
+    return str(int(elev))
 
-def has_file(elev, frame, elev_mult, elev_step, steps_per_elev, out_dir, **seq):
+def has_file(elev, frame, precision, elev_step, steps_per_elev, out_dir, **seq):
     '''
     See if the sequence of files associated with the given elevation
     already exists. If any of the files is missing, all will be redone.
     '''
-    e = e_to_filename(elev, elev_mult, elev_step)
+    e = e_to_filename(elev, precision, elev_step)
     for i in range(frame, frame + steps_per_elev):
         f = os.path.join(out_dir, '{0}_{1}.ppm'.format(e, i))
         if not os.path.exists(f):
@@ -517,7 +518,7 @@ def load_basemap(dem_file, dem_name, rgb_file, rgb_name, region, res, **kwargs):
     )
     os.system(cmd)
 
-def load_basin(tid, elev, basin_name, basin_name_elev, basin_dir, basin_pattern, elev_mult, elev_step, color_table, **kwargs):
+def load_basin(tid, elev, basin_name, basin_name_elev, basin_dir, basin_pattern, precision, elev_step, color_table, **kwargs):
     '''
     Load the basin raster and apply the colour table.
     Create an elevation layer to position it vertically.
@@ -526,7 +527,7 @@ def load_basin(tid, elev, basin_name, basin_name_elev, basin_dir, basin_pattern,
     # Create an elevation model for the basin raster.
     basin_name = basin_name.format(id = tid)
     basin_name_elev = basin_name_elev.format(id = tid)
-    e = e_to_filename(elev, elev_mult, elev_step)
+    e = e_to_filename(elev, precision, elev_step)
 
     # Create the file path.
     f = os.path.join(basin_dir, basin_pattern.format(e = e))
@@ -541,8 +542,9 @@ def load_basin(tid, elev, basin_name, basin_name_elev, basin_dir, basin_pattern,
     # We create a raster with the elevation lower than the desired elevation
     # everywhere except where there are valid pixels. There, we raise the pixels
     # above the desired elevation to avoid occlusion (somewhat).
+    p = pow(10., float(precision))
     os.system('r.mapcalc --overwrite expression="{o} = ({elev} - {e}) + ({b} > 0) * {e}"'.format(
-            elev = elev, e = 2., b = basin_name, o = basin_name_elev)
+            elev = elev / p, e = 2., b = basin_name, o = basin_name_elev)
     )
 
 def load_conn(tid, name, basins, elevation):
@@ -573,10 +575,10 @@ def load_conn(tid, name, basins, elevation):
                     where bid1 in ({ids}) and bid2 in ({ids}) \
                             and (elevation - {prec}) <= {elev} \
             ) \
-            select distinct on(bid1, bid2, elevation, len) bid1, bid2, elevation, geom \
+            select distinct on(gid, bid1, bid2, elevation, len) bid1, bid2, elevation, geom \
             from t \
-            group by bid1, bid2, elevation, geom, len \
-            order by elevation, len \
+            group by gid, bid1, bid2, elevation, geom, len \
+            order by elevation, len, gid \
     '''.format(
             lyr = layer,
             tmp = tmp,
@@ -602,16 +604,18 @@ def load_conn(tid, name, basins, elevation):
     return True
 
 def render_scene(tid, elev, frame, frames, basin_name, basin_name_elev, out_tpl, steps,
-        dem_name, rgb_name, position, focus, size, zexag, elev_mult, elev_step, steps_per_elev,
+        dem_name, rgb_name, position, focus, size, zexag, precision, elev_step, steps_per_elev,
         dem_file, height, perspective, basin_ids, region, **kwargs):
     '''
     Render the 3D image in m.nviz.image.
     '''
 
+    elevation = elev / pow(10., float(precision))
+
     # Format filenames.
     basin_name = basin_name.format(id = tid)
     basin_name_elev = basin_name_elev.format(id = tid)
-    e = e_to_filename(elev, elev_mult, elev_step)
+    e = e_to_filename(elev, precision, elev_step)
 
     # Start, end position and focus.
     foc0 = get_focus(focus[0][0], focus[0][1], focus[0][2], region)
@@ -621,7 +625,7 @@ def render_scene(tid, elev, frame, frames, basin_name, basin_name_elev, out_tpl,
 
     # Load the connection lines.
     spill_name = 'spill_{}'.format(tid)
-    load_conn(tid, spill_name, basin_ids, elev)
+    load_conn(tid, spill_name, basin_ids, elevation)
 
     # Iterate over the frames for this elevation step.
     for s in range(steps_per_elev):

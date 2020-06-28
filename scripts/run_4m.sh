@@ -6,11 +6,12 @@ dem=/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif
 seeds=v_poi.csv
 rdir=4m/r
 spill=4m/spill.csv
-estart=208
-eend=213
-estep=0.001
+estart=208000
+eend=213000
+estep=1
 minarea=10000
 maxdist=40
+precision=3
 
 flood \
 	-i $dem \
@@ -27,7 +28,8 @@ flood \
 	-end $eend \
 	-step $estep \
 	-b $minarea \
-	-d $maxdist
+	-d $maxdist \
+	-c $precision
 
 # Basin output.
 #	-dbc "PG:dbname=ec user=rob password=river" \

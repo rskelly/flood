@@ -585,22 +585,22 @@ namespace geo {
 
 		class Flood {
 		private:
-			float m_start;								///<! The start elevation.
-			float m_end;								///<! The end elevation (inclusive).
-			float m_step;								///<! The elevation step.
-			int m_precision;							///<! The precision; the number of decimal places to use.
-			float m_minBasinArea;						///<! Ignore basins smaller than this.
-			float m_maxSpillDist;						///<! Ignore spill paths longer than this (as the crow flies).
-			int m_t; 									///<! Number of threads
-			int m_band;									///<! The source band in the DEM.
-			bool m_overwrite;							///<! If false skip computation if the raster file exists.
-			Band<float> m_dem;							///<! The DEM.
-			BasinOutput* m_basinOutput;					///<! The basin output object.
-			SpillOutput* m_spillOutput;					///<! The spill point output object.
-			std::string m_input;						///<! The filename of the DEM.
-			std::string m_fseeds;						///<! The input handle for the seed file.
-			std::vector<Cell> m_seeds;					///<! List of seed cells.
-			std::vector<Basin> m_basinList;				///<! List of basins.
+			int m_start;					///<! The start elevation. An integer of (elevation * 10^precision).
+			int m_end;					///<! The end elevation (inclusive).
+			int m_step;					///<! The elevation step.
+			int m_precision;				///<! The precision; the number of decimal places to use.
+			float m_minBasinArea;				///<! Ignore basins smaller than this.
+			float m_maxSpillDist;				///<! Ignore spill paths longer than this (as the crow flies).
+			int m_t; 					///<! Number of threads
+			int m_band;					///<! The source band in the DEM.
+			bool m_overwrite;				///<! If false skip computation if the raster file exists.
+			Band<float> m_dem;				///<! The DEM.
+			BasinOutput* m_basinOutput;			///<! The basin output object.
+			SpillOutput* m_spillOutput;			///<! The spill point output object.
+			std::string m_input;				///<! The filename of the DEM.
+			std::string m_fseeds;				///<! The input handle for the seed file.
+			std::vector<Cell> m_seeds;			///<! List of seed cells.
+			std::vector<Basin> m_basinList;			///<! List of basins.
 			std::vector<SpillPoint> m_spillPoints;		///<! List of spill points.
 			std::vector<BreakLine> m_breakLines;		///<! List of breaklines.
 			std::mutex m_qmtx; 							///<! Mutex to protect the job queue.
@@ -629,7 +629,7 @@ namespace geo {
 			Flood(const std::string& input, int band, bool overwrite,
 					BasinOutput* basinOutput, SpillOutput* spillOutput,
 					const std::string& seeds,
-					float start, float end, float step, int precision,
+					int start, int end, int step, int precision,
 					float minBasinArea, float maxSpillDist,
 					const std::vector<BreakLine>& breakLines);
 
@@ -701,21 +701,21 @@ namespace geo {
 			 *
 			 * \return The start elevation.
 			 */
-			float start() const;
+			int start() const;
 
 			/**
 			 * \brief Return the end elevation (inclusive).
 			 *
 			 * \return The end elevation.
 			 */
-			float end() const;
+			int end() const;
 
 			/**
 			 * \brief Return the elevation step.
 			 *
 			 * \return The elevation step.
 			 */
-			float step() const;
+			int step() const;
 
 			/**
 			 * \brief Return the minimum basin area.

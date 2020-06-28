@@ -19,7 +19,7 @@ except:
     sys.exit(1)
 
 sky_file = '/home/rob/Desktop/ec/videos/sky/201908font_size_122718.jpg'
-colour_file = 'color.txt'
+colour_file = '/home/rob/Desktop/ec/videos/color.txt'
 font = '/usr/share/fonts/type1/gsfonts/p052003l.pfb'
 
 # Panel size.
@@ -174,7 +174,7 @@ def job(infiles, outdir, ids):
 
         # Get the elevation from the filename.
         f = os.path.basename(infile)
-        e = int(round(float(f[:7]) / 100.)) / 100.
+        e = float(f[:6]) / 1000.
 
         # If the image is not a png convert it as a tmp.
         tmp = '/tmp/overlay_{}.png'.format(os.getpid())
