@@ -46,9 +46,10 @@ void usage() {
 			<< " -v     Directory for basin vectors. If not given, they are not produced.\n"
 			<< " -r     Directory for basin rasters. If not given, they are produced.\n"
 			<< " -p     Spill point file. If not given, they are not produced. A Shapefile or CSV.\n"
-			<< " -start Starting elevation, in same units as input raster.\n"
-			<< " -end   Ending elevation.\n"
-			<< " -step  Step elevation.\n"
+			<< " -start Starting elevation, in same units as input raster times 10^precision. \n"
+			<< "        So 200m becomes 200000 if the precision is 3 (the default).\n"
+			<< " -end   Ending elevation. Same precision rule as for start.\n"
+			<< " -step  Step elevation. Same precision rule as for start.\n"
 			<< " -t     Number of threads to use. Default 1.\n"
 			<< " -b     Minimum basin area.\n"
 			<< " -d     Maximum spill distance.\n"
@@ -71,9 +72,9 @@ int main(int argc, char **argv) {
 	std::string rdir;
 	std::string vdir;
 	std::string spill;
-	double start = 0.0;
-	double end = 0.0;
-	double step = 0.0;
+	int start = 0;
+	int end = 0;
+	int step = 0;
 	double maxSpillDist = 100.0;
 	double minBasinArea = 100.0;
 	int t = 1;
@@ -109,11 +110,11 @@ int main(int argc, char **argv) {
 		} else if (a == "-p") {
 			spill = argv[++i];
 		} else if (a == "-start") {
-			start = atof(argv[++i]);
+			start = atoi(argv[++i]);
 		} else if (a == "-end") {
-			end = atof(argv[++i]);
+			end = atoi(argv[++i]);
 		} else if (a == "-step") {
-			step = atof(argv[++i]);
+			step = atoi(argv[++i]);
 		} else if (a == "-t") {
 			t = atoi(argv[++i]);
 		} else if (a == "-b") {
