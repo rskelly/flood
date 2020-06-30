@@ -169,6 +169,14 @@ float geo::flood::Cell::value() const {
 	return m_value;
 }
 
+int geo::flood::Cell::priority() const {
+	return m_priority;
+}
+
+void geo::flood::Cell::setPriority(int priority) {
+	m_priority = priority;
+}
+
 float geo::flood::Cell::distance(const Cell& other, float resx, float resy) const {
 	float x0 = col() * resx;
 	float y0 = row() * resy;
@@ -446,6 +454,34 @@ void Flood::loadSeeds(bool header) {
 		g_debug("Found seed: " << id << ", " << x << ", " << y << ", " << props.toCol(x) << ", " << props.toRow(y) << ", " << priority);
 		m_seeds.emplace_back(0, id, props.toCol(x), props.toRow(y), 0, priority);
 	}
+
+	// Sort the points without priority by sorting on their elevations and
+	// assiging a lower priority to the ones with a higher elevation.
+	g_debug("Sorting points...");
+	int maxpriority = 0;
+	float nd = (float) m_dem.props().nodata();
+	std::vector<std::pair<Cell*, float>> ecells;
+	for(Cell& c : m_seeds) {
+		if(c.priority() == geo::maxvalue<int>()) {
+			// Add the non-priority Cells and elevations to the list.
+			float e = m_dem.get(c.col(), c.row());
+			ecells.emplace_back(&c, e == nd ? geo::minvalue<float>() : e);
+		}else if(c.priority() > maxpriority) {
+			// Find the max set priority.
+			maxpriority = c.priority();
+		}
+	}
+
+	// Reverse-sort on elevation.
+	std::sort(ecells.begin(), ecells.end(), [](const std::pair<Cell*, float>& a, const std::pair<Cell*, float>& b) {
+		return a.second > b.second;
+	});
+
+	// Assign the priorities.
+	for(size_t i = 0; i < ecells.size(); ++i)
+		ecells[i].first->setPriority(i + maxpriority + 1);
+
+	// Re-sort on priority.
 	std::sort(m_seeds.begin(), m_seeds.end());
 }
 

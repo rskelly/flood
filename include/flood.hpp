@@ -161,6 +161,20 @@ namespace geo {
 				 */
 				float distance(const Cell& other, float resx, float resy) const;
 
+				/**
+				 * \brief Get the Cell's priority. Max int value if none.
+				 *
+				 * \return The Cell's priority. Max int value if none.
+				 */
+				int priority() const;
+
+				/**
+				 * \brief Set the Cell's priority. Max int value if none.
+				 *
+				 * \param priority The Cell's priority. Max int value if none.
+				 */
+				void setPriority(int priority);
+
 			};
 
 			/**
