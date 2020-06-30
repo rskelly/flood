@@ -586,7 +586,7 @@ void Flood::init() {
 	if(!std::isnan(m_smoothAlpha) && m_smoothAlpha > 0 && !std::isnan(m_smoothRadius) && m_smoothRadius > 0) {
 		g_debug("Smoothing raster...");
 		Band<float> dem(m_input, m_band - 1, false, true);
-		int rad = (int) std::ceil(m_smoothRadius / std::abs(dem.props().resX()));
+		int rad = (int) std::ceil((m_smoothRadius * 2) / std::abs(dem.props().resX()));
 		m_dem.init(dem.props(), true);
 		dem.smooth(m_dem, m_smoothAlpha, rad);
 	} else {
