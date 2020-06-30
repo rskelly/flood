@@ -48,7 +48,7 @@ panels = {
         16: ('Horseshoe Slough',),
         17: ('Lake 540',),
         18: ('PAD 58',),
-        19: ('Spruce I. Lk./PAD5'),
+        19: ('Spruce I. Lk./PAD5',),
         20: ('Pete\'s Ck./PAD15',),
         21: ('Rocher Pond',),
         22: ('Slave River',),
