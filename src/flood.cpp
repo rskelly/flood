@@ -60,6 +60,62 @@ namespace {
 		return data;
 	}
 
+	/**
+	 * \brief Check if the column exists and is required.
+	 *
+	 * If the column is missing and required, an exception is raised.
+	 * If the column is missing and not required returns false.
+	 * Else, returns true.
+	 *
+	 * \param col The name of the column.
+	 * \param colMap The mapping of columns to indices.
+	 * \param colReq The mapping of columns to required.
+	 * \return True if present. False if missing and not required.
+	 */
+	bool checkCol(const std::string& col,
+			const std::vector<std::string>& row,
+			const std::unordered_map<std::string, int>& colMap,
+			const std::unordered_map<std::string, bool>& colReq) {
+		if(colMap.find(col) == colMap.end() || colMap.at(col) >= row.size()) {
+			// Column is missing.
+			if(colReq.find(col) != colReq.end() && colReq.at(col)) {
+				// Column is required.
+				g_runerr("Missing seed column " << col << " is required.");
+			} else {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	int getIntCol(const std::string& col, const std::vector<std::string>& row,
+			const std::unordered_map<std::string, int>& colMap,
+			const std::unordered_map<std::string, bool>& colReq,
+			int def) {
+		if(checkCol(col, row, colMap, colReq))
+			return (int) std::strtol(row[colMap.at(col)].c_str(), nullptr, 10);
+		return def;
+	}
+
+	int getFloatCol(const std::string& col, const std::vector<std::string>& row,
+			const std::unordered_map<std::string, int>& colMap,
+			const std::unordered_map<std::string, bool>& colReq,
+			float def) {
+		if(checkCol(col, row, colMap, colReq))
+			return (float) std::strtod(row[colMap.at(col)].c_str(), nullptr);
+		return def;
+	}
+
+	int getBoolCol(const std::string& col, const std::vector<std::string>& row,
+			const std::unordered_map<std::string, int>& colMap,
+			const std::unordered_map<std::string, bool>& colReq,
+			bool def) {
+		if(checkCol(col, row, colMap, colReq)) {
+			std::string v = lowercase(row[colMap.at(col)]);
+			return v == "true" || v == "t" || std::strtol(v.c_str(), nullptr, 10) != 0;
+		}
+		return def;
+	}
 
 	void worker(Flood* config, std::queue<int>* elevations) {
 
@@ -439,19 +495,49 @@ const std::vector<SpillPoint>& Flood::spillPoints() const {
 void Flood::loadSeeds(bool header) {
 	if (m_fseeds.empty())
 		g_argerr("No seed file given.");
+
 	std::ifstream csv(m_fseeds);
 	std::vector<std::string> row;
-	if (header)
+
+	// Holds the row indices of each column.
+	std::unordered_map<std::string, int> colMap;
+	// Indicates which columns are required.
+	std::unordered_map<std::string, bool> colReq = {{"gid", true}, {"x", true}, {"y", true}, {"priority", false}, {"keep", false}};
+
+	if (header) {
+		// Assign the indices to columns.
 		readline(csv, row);
+		for(size_t i = 0; i < row.size(); ++i) {
+			std::string c = lowercase(row[i]);
+			if(colReq.find(c) != colReq.end())
+				colMap.emplace(c, i);
+		}
+	} else {
+		// Columns in the seed file are expected in this order.
+		std::vector<std::string> colOrder = {"gid", "x", "y", "priority", "keep"};
+		for(size_t i = 0; i < colOrder.size(); ++i)
+			colMap.emplace(colOrder[i], i);
+	}
+
 	const GridProps &props = m_dem.props();
+	int ridx = 0;
 	while (readline(csv, row)) {
-		int id = (int) std::strtol(row[0].c_str(), nullptr, 10);
-		float x = std::strtod(row[1].c_str(), nullptr);
-		float y = std::strtod(row[2].c_str(), nullptr);
-		// Set the priority if there's an extant 4th column, otherwise maxvalue.
-		int priority = row.size() < 4 || row[3].empty() ? geo::maxvalue<int>() : std::strtol(row[3].c_str(), nullptr, 10);
+		bool keep = getBoolCol("keep", row, colMap, colReq, true);
+		if(!keep)
+			continue;
+		int id = getIntCol("gid", row, colMap, colReq, -1);
+		if(id <= 0)
+			g_runerr("Invalid or missing seed ID (" << id << ") on row " << ridx);
+		float x = getFloatCol("x", row, colMap, colReq, std::nan(""));
+		if(std::isnan(x))
+			g_runerr("Invalid or missing seed X (" << x << ") on row " << ridx);
+		float y = getFloatCol("y", row, colMap, colReq, std::nan(""));
+		if(std::isnan(y))
+			g_runerr("Invalid or missing seed Y (" << y << ") on row " << ridx);
+		int priority = getIntCol("priority", row, colMap, colReq, 0);
 		g_debug("Found seed: " << id << ", " << x << ", " << y << ", " << props.toCol(x) << ", " << props.toRow(y) << ", " << priority);
 		m_seeds.emplace_back(id, props.toCol(x), props.toRow(y), 0, priority);
+		++ridx;
 	}
 
 	// Sort the points without priority by sorting on their elevations and
