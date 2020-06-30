@@ -76,7 +76,7 @@ namespace {
 			const std::vector<std::string>& row,
 			const std::unordered_map<std::string, int>& colMap,
 			const std::unordered_map<std::string, bool>& colReq) {
-		if(colMap.find(col) == colMap.end() || colMap.at(col) >= row.size()) {
+		if(colMap.find(col) == colMap.end() || colMap.at(col) >= (int) row.size()) {
 			// Column is missing.
 			if(colReq.find(col) != colReq.end() && colReq.at(col)) {
 				// Column is required.
