@@ -50,7 +50,6 @@ namespace geo {
 				int m_row;			///<! The cell row.
 				int m_cellId;		///<! The cell ID.
 				float m_value;		///<! The cell value.
-				int m_seedId;		///<! The ID of the seed that originated this cell.
 				int m_priority;		///<! The cell's priority.
 
 			public:
@@ -69,16 +68,7 @@ namespace geo {
 				 * \param value The value.
 				 * \param priority The basin's priority.
 				 */
-				Cell(int id, int seedId, int col, int row, float value, int priority);
-
-				/**
-				 * \brief Construct a new cell with the grid coordinates and an automatic ID and explicit value.
-				 *
-				 * \param col The column.
-				 * \param row The row.
-				 * \param value The value.
-				 */
-				Cell(int seedId, int col, int row, float value, int proiority = geo::maxvalue<int>());
+				Cell(int id, int col, int row, float value, int priority);
 
 				/**
 				 * \brief Return the coordinate by axis index.
@@ -136,13 +126,6 @@ namespace geo {
 				 * \return The cell's ID.
 				 */
 				int cellId() const;
-
-				/**
-				 * \brief Return the ID of the seed that originated this cell.
-				 *
-				 * \return The ID of the seed that originated this cell.
-				 */
-				int seedId() const;
 
 				/**
 				 * \brief Return the cell's value.

@@ -113,8 +113,8 @@ void SpillDBOutput::saveSpillPoints(Band<float>& dem, const std::vector<SpillPoi
 		feat.SetField(idField.c_str(), (long long) ++id);
 		feat.SetField(elevationField.c_str(), sp.elevation());
 		feat.SetField(maxElevationField.c_str(), maxElev);
-		feat.SetField(bid1Field.c_str(), (long long) c1.seedId());
-		feat.SetField(bid2Field.c_str(), (long long) c2.seedId());
+		feat.SetField(bid1Field.c_str(), (long long) c1.cellId());
+		feat.SetField(bid2Field.c_str(), (long long) c2.cellId());
 		OGRGeometry* geom;
 		if(OGRERR_NONE != gf.createFromWkt(pathStr.c_str(), &sr, &geom))
 			g_warn("Failed to make linestring.");
@@ -220,7 +220,7 @@ void SpillFileOutput::saveSpillPoints(Band<float>& dem, const std::vector<SpillP
 				pathStr = ss.str();
 			}
 		}
-		out << ++id << ", " << c1.seedId() << "," << x1 << "," << y1 << "," << c2.seedId() << ","
+		out << ++id << ", " << c1.cellId() << "," << x1 << "," << y1 << "," << c2.cellId() << ","
 				<< x2 << "," << y2 << "," << x3 << "," << y3 << ","
 				<< sp.elevation() << "," << dist << "," << maxElev << "," << pathStr << std::endl;
 	}

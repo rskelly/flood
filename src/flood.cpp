@@ -29,9 +29,14 @@ namespace {
 	 *
 	 * \return The next cell ID.
 	 */
-	int nextCellId() {
+	int nextCellId(int id) {
 		std::lock_guard<std::mutex> lk(cellIdMtx);
-		return ++cellId;
+		if(id == 0) {
+			return ++cellId;
+		} else {
+			if(id >= cellId) cellId = id;
+			return id;
+		}
 	}
 
 	/**
@@ -118,14 +123,13 @@ namespace {
 } // anon
 
 geo::flood::Cell::Cell() :
-		Cell(0, 0, 0, 0, 0, 0) {
+		Cell(0, 0, 0, 0, 0) {
 }
 
-geo::flood::Cell::Cell(int id, int seedId, int col, int row, float value, int priority) :
+geo::flood::Cell::Cell(int id, int col, int row, float value, int priority) :
 	m_col(col), m_row(row),
-	m_cellId(id > 0 ? id : nextCellId()),
+	m_cellId(nextCellId(id)),
 	m_value(value),
-	m_seedId(seedId),
 	m_priority(priority > 0 ? priority : geo::maxvalue<int>()) {
 }
 
@@ -159,10 +163,6 @@ int geo::flood::Cell::col() const {
 
 int geo::flood::Cell::cellId() const {
 	return m_cellId;
-}
-
-int geo::flood::Cell::seedId() const {
-	return m_seedId;
 }
 
 float geo::flood::Cell::value() const {
@@ -219,8 +219,7 @@ int Basin::computeEdges(Band<int>& grd, mqtree<Cell>& edgeCells) {
 					int ro = r + offset[i][0];
 					// Check if this is an edge pixel.
 					if(co < 0 || ro < 0 || co >= cols || ro >= rows || grd.get(co, ro) != m_id) {
-						edgeCells.add(Cell(0, m_id, c, r, 0, 0));
-						// out << props.toX(c) << "," << props.toY(r) << "\n";
+						edgeCells.add(Cell(m_id, c, r, 0, 0));
 						++count;
 						break;
 					}
@@ -452,7 +451,7 @@ void Flood::loadSeeds(bool header) {
 		// Set the priority if there's an extant 4th column, otherwise maxvalue.
 		int priority = row.size() < 4 || row[3].empty() ? geo::maxvalue<int>() : std::strtol(row[3].c_str(), nullptr, 10);
 		g_debug("Found seed: " << id << ", " << x << ", " << y << ", " << props.toCol(x) << ", " << props.toRow(y) << ", " << priority);
-		m_seeds.emplace_back(0, id, props.toCol(x), props.toRow(y), 0, priority);
+		m_seeds.emplace_back(id, props.toCol(x), props.toRow(y), 0, priority);
 	}
 
 	// Sort the points without priority by sorting on their elevations and
@@ -646,7 +645,7 @@ void Flood::findMinima() {
 				}
 			}
 			if (!skip)
-				m_seeds.emplace_back(0, 0, c, r, m_dem.get(c, r), 0);
+				m_seeds.emplace_back(0, c, r, m_dem.get(c, r), 0);
 		}
 	}
 }
