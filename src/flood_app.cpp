@@ -98,6 +98,9 @@ int main(int argc, char **argv) {
 	std::string smaxElev;
 	std::vector<std::string> sbid;
 
+	float smoothAlpha = std::nan("");
+	float smoothRadius = std::nan("");
+
 	for (int i = 1; i < argc; ++i) {
 		std::string a(argv[i]);
 		if (a == "-i") {
@@ -154,6 +157,15 @@ int main(int argc, char **argv) {
 			smaxElev = argv[++i];
 		} else if(a == "-dsb") {
 			split(std::back_inserter(sbid), argv[++i], ",");
+		} else if(a == "-g") {
+			std::vector<std::string> list;
+			geo::util::split(std::back_inserter(list), argv[++i], ",");
+			if(list.size() < 2) {
+				g_warn("Need two elements for smoothing. Ignoring.");
+			} else {
+				smoothAlpha = std::strtof(list[0].c_str(), nullptr);
+				smoothRadius = std::strtof(list[1].c_str(), nullptr);
+			}
 		}
 	}
 
@@ -191,6 +203,8 @@ int main(int argc, char **argv) {
 		Flood config(input, band, overwrite, basinOutput, spillOutput, seeds,
 			start, end, step, precision,
 			minBasinArea, maxSpillDist, breakLines);
+		if(!std::isnan(smoothAlpha) && !std::isnan(smoothRadius))
+			config.setSmoothing(smoothAlpha, smoothRadius);
 		config.flood(t);
 	} catch (const std::exception &e) {
 		std::cerr << e.what() << "\n";

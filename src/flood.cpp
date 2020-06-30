@@ -583,10 +583,15 @@ void Flood::init() {
 	validateInputs();
 
 	g_debug("Initing...");
-	Band<float> dem(m_input, m_band - 1, false, true);
-	m_dem.init("/tmp/smooth.tif", dem.props()); //m_input, m_band - 1, false, true);
-	dem.smooth(m_dem);
-	m_dem.flush();
+	if(!std::isnan(m_smoothAlpha) && m_smoothAlpha > 0 && !std::isnan(m_smoothRadius) && m_smoothRadius > 0) {
+		g_debug("Smoothing raster...");
+		Band<float> dem(m_input, m_band - 1, false, true);
+		int rad = (int) std::ceil(m_smoothRadius / std::abs(dem.props().resX()));
+		m_dem.init(dem.props(), true);
+		dem.smooth(m_dem, m_smoothAlpha, rad);
+	} else {
+		m_dem.init(m_input, m_band - 1, false, true);
+	}
 
 	if(!m_breakLines.empty()) {
 		for(const BreakLine& l : m_breakLines)
@@ -604,6 +609,11 @@ void Flood::init() {
 	g_debug("Stats: " << stats.min << ", " << stats.max);
 	if (m_end < m_start)
 		g_argerr("The ending elevation must be larger than the starting elevation: " << m_start << ", " << m_end);
+}
+
+void Flood::setSmoothing(float smoothAlpha, float smoothRadius) {
+	m_smoothAlpha = smoothAlpha;
+	m_smoothRadius = smoothRadius;
 }
 
 int Flood::fillBasins(Band<int>& basinRaster, float elevation) {

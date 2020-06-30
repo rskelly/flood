@@ -602,6 +602,9 @@ namespace geo {
 			std::vector<BreakLine> m_breakLines;		///<! List of breaklines.
 			std::mutex m_qmtx; 							///<! Mutex to protect the job queue.
 
+			float m_smoothAlpha;							///!< Alpha value for Gaussian smoothing.
+			float m_smoothRadius;							///<! Radius (map units) for Gaussian smoothing.
+
 		public:
 
 			bool cancel;	///<! If true, current operations are cancelled.
@@ -629,6 +632,17 @@ namespace geo {
 					int start, int end, int step, int precision,
 					float minBasinArea, float maxSpillDist,
 					const std::vector<BreakLine>& breakLines);
+
+			/**
+			 * \brief Configure smoothing of source raster.
+			 *
+			 * The alpha value is the standard deviation of the Gaussian smoothing
+			 * curve, the radius is the kernel radius in map units.
+			 *
+			 * \param smoothAlpha The standard deviation of the Gaussian smoothing curve.
+			 * \param smoothRadius The radius of the kernel in map units.
+			 */
+			void setSmoothing(float smoothAlpha, float smoothRadius);
 
 			/**
 			 * \brief Return the queue mutex.
