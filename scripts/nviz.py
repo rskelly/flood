@@ -25,7 +25,7 @@ import psycopg2 as pg
 
 # Debug mode. Makes only the first and last images
 # in coarse mode and always overwrites.
-debug = False
+debug = True
 
 # Set to true to overwrite existing outputs. Otherwise,
 # set to false and merely delete the images you want redone.
@@ -328,7 +328,7 @@ sequences = [
                 'basin_ids': (1, 13, 15, 23),
         },
         {
-                'active': True,
+                'active': False,
                 'name': 'PAD 5/Spruce Island Lk.',
                 'out_dir': '/home/rob/Desktop/ec/videos/pad5',
                 'out_pattern': '{e}_{n}',
@@ -342,19 +342,19 @@ sequences = [
                 'elev_step': 1,
                 'precision': 3,
                 'size': (1920, 1080),
-                'position': ((471585.019,6522302.672), (471991.230,6522885.782)),
+                'position': ((470876.164,6521302.979), (471131.684,6521512.637)),
                 'height': 500,
                 'zexag': 2,
-                'focus': ((472354.855,6522975.082, 200), (472354.855,6522975.082, 200.)),
-                'region': (466365.,6525413., 480694.,6517420.),
+                'focus': ((472370.825,6522942.630, 200.), (472370.825,6522942.630, 200.)),
+                'region': (468720., 6525296., 482852., 6514252.),
                 'res': 4.,
                 'steps_per_elev': 3,
-                'perspective': 35.,
+                'perspective': 30.,
                 'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (19, 23),
+                'basin_ids': (21, 24),
         },
         {
-                'active': True,
+                'active': False,
                 'name': 'W. Pushup Lk.',
                 'out_dir': '/home/rob/Desktop/ec/videos/w_pushup_lk',
                 'out_pattern': '{e}_{n}',
@@ -368,19 +368,19 @@ sequences = [
                 'elev_step': 1,
                 'precision': 3,
                 'size': (1920, 1080),
-                'position': ((473000.207,6519541.940), (473182.839,6522822.548)),
+                'position': ((470925.303,6520755.904), (470925.303,6519755.904)),
                 'height': 500,
                 'zexag': 2,
-                'focus': ((471912.609,6521435.409, 200), (472253.302,6521350.236, 200.)),
-                'region': (469912.,6524460., 480694.,6517420.),
+                'focus': ((471702.542,6521419.337, 200), (472908.073,6521288.301, 200.)),
+                'region': (464908.,6525972., 479504.,6512348.),
                 'res': 4.,
                 'steps_per_elev': 3,
-                'perspective': 60.,
+                'perspective': 45.,
                 'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (4, 5, 6, 15, 23),
+                'basin_ids': (4, 5, 6, 16, 24),
         },
         {
-                'active': True,
+                'active': False,
                 'name': 'Pushup Lk.',
                 'out_dir': '/home/rob/Desktop/ec/videos/pushup_lk',
                 'out_pattern': '{e}_{n}',
@@ -394,19 +394,19 @@ sequences = [
                 'elev_step': 1,
                 'precision': 3,
                 'size': (1920, 1080),
-                'position': ((477428.404,6519841.480), (475665.970,6521125.632)),
+                'position': ((477657.276,6516353.095), (476366.571,6512418.613)),
                 'height': 500,
                 'zexag': 2,
-                'focus': ((473182.839,6522822.548, 200), (476511.152,6519939.757, 200.)),
-                'region': (469513.831,6524584.982, 483062.950,6514442.798),
+                'focus': ((477340.364,6518942.757, 200), (477340.364,6518942.757, 200.)),
+                'region': (467136.,6523096., 481660.,6510460.),
                 'res': 4.,
                 'steps_per_elev': 3,
                 'perspective': 30.,
                 'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (5, 6, 15, 23),
+                'basin_ids': (5, 6, 16, 24),
         },
         {
-                'active': True,
+                'active': False,
                 'name': 'Pete\'s Ck.',
                 'out_dir': '/home/rob/Desktop/ec/videos/petes_ck',
                 'out_pattern': '{e}_{n}',
@@ -420,16 +420,16 @@ sequences = [
                 'elev_step': 1,
                 'precision': 3,
                 'size': (1920, 1080),
-                'position': ((470490.049,6532204.723), (470824.191,6532899.214)),
+                'position': ((469546.149,6527118.424), (470723.048,6527618.424)),
                 'height': 500,
                 'zexag': 2,
-                'focus': ((470994.538,6534157.159, 200), (470437.635,6533790.258, 200.)),
-                'region': (464645.845,6538435.483, 479924.639,6527887.088),
+                'focus': ((471057.189,6534156.033, 200), (470454.424,6533907.065, 200.)),
+                'region': (464645.845,6538435.483, 480924.639,6527387.088),
                 'res': 4.,
                 'steps_per_elev': 3,
-                'perspective': 45.,
+                'perspective': 30.,
                 'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (20, 23),
+                'basin_ids': (22, 24),
         },
         {
                 'active': False,
@@ -442,15 +442,15 @@ sequences = [
                 'dem_name': 'pad_dem_4m',
                 'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
                 'rgb_name': 'pad_ortho',
-                'elev_range': (209300, 210300),
+                'elev_range': (209500, 211000),
                 'elev_step': 1,
                 'precision': 3,
                 'size': (1920, 1080),
-                'position': ((470628.456,6531374.487), (470733.285,6533032.092)),
+                'position': ((474297.327,6525976.217), (477797.327,6525976.217)),
                 'height': 500,
                 'zexag': 2,
-                'focus': ((471028.116,6534139.346, 200), (470399.143,6533975.551, 200.)),
-                'region': (466384.,6523654., 480118.,6515240.),
+                'focus': ((473786.286,6527301.623, 200), (473786.286,6527301.623, 200.)),
+                'region': (466372.,6532020., 477256.,6520912.),
                 'res': 4.,
                 'steps_per_elev': 3,
                 'perspective': 45.,
@@ -458,7 +458,7 @@ sequences = [
                 'basin_ids': (20, 23),
         },
         {
-                'active': True,
+                'active': False,
                 'name': 'Egg Lake',
                 'out_dir': '/home/rob/Desktop/ec/videos/egg_lk_1',
                 'out_pattern': '{e}_{n}',
@@ -481,7 +481,7 @@ sequences = [
                 'steps_per_elev': 3,
                 'perspective': 45.,
                 'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (1, 13, 15, 23),
+                'basin_ids': (2, 14, 24),
         },
         {
                 'active': True,
@@ -498,16 +498,16 @@ sequences = [
                 'elev_step': 1,
                 'precision': 3,
                 'size': (1920, 1080),
-                'position': ((475626.659,6521535.120), (477487.370,6520486.832)),
+                'position': ((475446.317,6520885.470), (476136.439,6520256.497)),
                 'height': 500,
                 'zexag': 2,
-                'focus': ((475102.515,6520119.931, 200), (475980.456,6519844.756, 200.)),
-                'region': (469795.559,6523988.768, 480907.,6510436.),
+                'focus': ((475424.236,6520409.132, 200), (475424.236,6520409.132, 200.)),
+                'region': (463516.,6525028., 481908.,6510976.),
                 'res': 4.,
                 'steps_per_elev': 3,
-                'perspective': 45.,
+                'perspective': 30.,
                 'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (6, 5, 15, 23),
+                'basin_ids': (4, 5, 6, 14, 24),
         }
 ]
 
@@ -624,6 +624,15 @@ def get_raster_value(ds, band, x, y):
     d = b.ReadAsArray(c, r, 1, 1)
     return d[0,0]
 
+def get_raster_bounds(ds):
+    '''
+    Get the boundaries of the raster, w, n, e, s.
+    '''
+    w = ds.RasterXSize
+    h = ds.RasterYSize
+    trans = ds.GetGeoTransform()
+    return (trans[0], trans[3], trans[0] + w * trans[1], trans[3] + h * trans[5])
+
 def get_focus(x, y, z, region):
     '''
     Calculate the focus for nviz, which is metres in x/y/z, from the
@@ -653,7 +662,7 @@ def get_position(px, py, height, zexag, region):
         my = (region[1] - py) * scale
         dx = (mx + rng_off) / rng
         dy = (my + rng_off) / rng
-        print(dx, dy)
+        #print(dx, dy, w, h, scale, mx, my, longdim, gs_unit_size, rng, rng_off)
     except:
         print(tb.format_exc())
     return dx, dy
@@ -681,14 +690,12 @@ def load_basemap(dem_file, dem_name, rgb_file, rgb_name, region, res, **kwargs):
         os.system('r.in.gdal input={i} output={o}'.format(i = dem_file, o = dem_name))
     except: pass
 
-    # Set computational region
-    os.system('g.region raster={r}'.format(r = dem_name))
-
     print('Loading ortho:', rgb_file, 'as', rgb_name)
 
     # Load rgb if not exists
     try:
         os.system('r.in.gdal input={i} output={o}'.format(i = rgb_file, o = rgb_name))
+        os.system('g.region raster={r}.red'.format(r = rgb_name))
         os.system('r.composite -c red={r}.red green={r}.green blue={r}.blue levels=32 output={r}'.format(r = rgb_name))
     except: pass
 
@@ -798,6 +805,8 @@ def render_scene(tid, elev, frame, frames, basin_name, basin_name_elev, out_tpl,
     basin_name = basin_name.format(id = tid)
     basin_name_elev = basin_name_elev.format(id = tid)
     e = e_to_filename(elev, precision, elev_step)
+
+    #rregion = get_raster_bounds(gdal.Open(dem_file))
 
     # Start, end position and focus.
     foc0 = get_focus(focus[0][0], focus[0][1], focus[0][2], region)
