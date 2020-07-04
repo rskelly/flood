@@ -1,0 +1,352 @@
+{
+    "basin_dir": "/home/rob/Desktop/ec/videos/4m/r",
+    "basin_pattern": "{e}.tif",
+    "colour_table": "/home/rob/Desktop/ec/videos/color.txt",
+    "region_radius": 10000.0,
+    "nviz_mode": "coarse",
+    "configs": [
+        {
+            "active": false,
+            "basin_ids": [18,24],
+            "elev_range": [209500,211000],
+            "focus": [
+                [466372.654,6525386.451,200.0],
+                [466097.478,6525438.865,200.0]
+            ],
+            "height": 500,
+            "id": 18,
+            "name": "PAD38 - Horseshoe Slough",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/horseshoe_slough",
+            "perspective": 40.0,
+            "position": [
+                [464675.738,6524901.618],
+                [465396.436,6524921.273]
+            ]
+        },
+        {
+            "active": false,
+            "basin_ids": [19,20,24],
+            "elev_range": [209500,212000],
+            "focus": [
+                [468162.933,6521199.852,200.0],
+                [468162.933,6521199.852,200.0]
+            ],
+            "height": 500,
+            "id": 19,
+            "name": "PAD 58",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/pad58_lake540",
+            "perspective": 30.0,
+            "position": [
+                [466729.727,6519401.383],
+                [466952.488,6519781.387]
+            ]
+        },
+        {
+            "active": false,
+            "basin_ids": [7,23,24],
+            "elev_range": [208500,210000],
+            "focus": [
+                [481739.897,6521792.789,200.0],
+                [482113.349,6521956.584,200.0]
+            ],
+            "height": 500,
+            "id": 7,
+            "name": "Lake 50",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/lake50",
+            "perspective": 65.0,
+            "position": [
+                [479676.080,6522002.447],
+                [480920.922,6522572.453]
+            ]
+        },
+        {
+            "active": false,
+            "basin_ids": [23,7,24],
+            "elev_range": [209000,210300],
+            "focus": [
+                [483679.229,6521465.200,200.0],
+                [483679.229,6521465.200,200.0]
+            ],
+            "height": 500,
+            "id": 23,
+            "name": "PAD 37 - Rocher Pond",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/pad37",
+            "perspective": 45.0,
+            "position": [
+                [485363.041,6520927.952],
+                [484983.037,6521085.195]
+            ]
+        },
+        {
+            "active": false,
+            "basin_ids": [12,24],
+            "elev_range": [208500,210500],
+            "focus": [
+                [479839.875,6516885.492,200.0],
+                [479839.875,6516885.492,200.0]
+            ],
+            "height": 500,
+            "id": 12,
+            "name": "PAD 5b - Mud Lake",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/pad5b",
+            "perspective": 30.0,
+            "position": [
+                [478228.133,6516243.416],
+                [478463.998,6516354.797]
+            ]
+        },
+        {
+            "active": false,
+            "basin_ids": [15,24],
+            "elev_range": [208500,210000],
+            "focus": [
+                [479245.299,6519565.997,200.0],
+                [478930.813,6520240.832,200.0]
+            ],
+            "height": 500,
+            "id": 15,
+            "name": "Lake 582",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/lake582",
+            "perspective": 30.0,
+            "position": [
+                [478596.671,6520653.596],
+                [477554.936,6521059.807]
+            ]
+        },
+        {
+            "active": false,
+            "basin_ids": [9,8,24],
+            "elev_range": [209000,210500],
+            "focus": [
+                [481060.148,6509197.776,200.0],
+                [481060.148,6509197.776,200.0]
+            ],
+            "height": 500,
+            "id": 9,
+            "name": "Edward's Lake",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/edwards_lk",
+            "perspective": 45.0,
+            "position": [
+                [482933.962,6508827.599],
+                [481833.260,6507949.658]
+            ]
+        },
+        {
+            "active": false,
+            "basin_ids": [8,9,24],
+            "elev_range": [209000,210500],
+            "focus": [
+                [481479.463,6510210.029,200.0],
+                [481479.463,6510210.029,200.0]
+            ],
+            "height": 500,
+            "id": 8,
+            "name": "Flett Lake",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/flett_lk",
+            "perspective": 30.0,
+            "position": [
+                [480680.143,6511300.903],
+                [478819.433,6511982.290]
+            ]
+        },
+        {
+            "active": false,
+            "basin_ids": [13,12,24],
+            "elev_range": [209500,210500],
+            "focus": [
+                [480922.560,6515140.257, 200.0],
+                [480922.560,6515140.257, 200.0]
+            ],
+            "height": 500,
+            "id": 13,
+            "name": "Lake 565",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/lake565",
+            "perspective": 30.0,
+            "position": [
+                [479428.750,6515081.291],
+                [479415.646,6512971.612]
+            ]
+        },
+        {
+            "active": false,
+            "basin_ids": [14,1,5,24],
+            "elev_range": [209500,210500],
+            "focus": [
+                [477040.619,6522789.482,200.0],
+                [477040.619,6522789.482,200.0]
+            ],
+            "height": 500,
+            "id": 14,
+            "name": "Lake 577",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/lake577",
+            "perspective": 45.0,
+            "position": [
+                [477479.590,6522042.577],
+                [477695.799,6521466.019]
+            ]
+        },
+        {
+            "active": false,
+            "basin_ids": [21,24],
+            "elev_range": [208780,210500],
+            "focus": [
+                [472329.876,6523015.519, 200.0],
+                [472329.876,6523015.519, 200.0]
+            ],
+            "height": 500,
+            "id": 21,
+            "name": "PAD 5 - Spruce Island Lake",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/pad5",
+            "perspective": 30.0,
+            "position": [
+                [471773.792,6524061.350],
+                [471567.411,6524415.147]
+            ]
+        },
+        {
+            "active": false,
+            "basin_ids": [4,5,21,24],
+            "elev_range": [209200,210200],
+            "focus": [
+                [472008.019,6521455.372,200.0],
+                [472008.019,6521455.372,200.0]
+            ],
+            "height": 500,
+            "id": 4,
+            "name": "W. Pushup Lake",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/w_pushup_lk",
+            "perspective": 45.0,
+            "position": [
+                [474124.250,6521193.300],
+                [475198.745,6521252.266]
+            ]
+        },
+        {
+            "active": false,
+            "basin_ids": [6,5,16,24],
+            "elev_range": [209400,210400],
+            "focus": [
+                [477331.355,6518983.706,200.0],
+                [476558.243,6519927.165,200.0]
+            ],
+            "height": 500,
+            "id": 6,
+            "name": "Pushup Lake",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/pushup_lk",
+            "perspective": 30.0,
+            "position": [
+                [477482.047,6519966.476],
+                [477259.286,6520484.068]
+            ]
+        },
+        {
+            "active": false,
+            "basin_ids": [22,24],
+            "elev_range": [209300,210300],
+            "focus": [
+                [471074.388,6534167.499,200.0],
+                [471074.388,6534167.499,200.0]
+            ],
+            "height": 500,
+            "id": 22,
+            "name": "PAD 15 - Pete's Creek",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/petes_ck",
+            "perspective": 30.0,
+            "position": [
+                [470445.415,6531638.504],
+                [470681.280,6531704.022]
+            ]
+        },
+        {
+            "active": false,
+            "id": 3,
+            "basin_ids": [3,1,24],
+            "name": "Arden's Slough",
+            "elev_range": [209500,211000],
+            "focus": [
+                [473786.286,6527301.623,200.0],
+                [473786.286,6527301.623,200.0]
+            ],
+            "position": [
+                [475161.891,6526225.081],
+                [474572.229,6526729.570]
+            ],
+            "height": 500,
+            "perspective": 45.0,
+            "out_dir": "/home/rob/Desktop/ec/videos/output/ardens_slough"
+        },
+        {
+            "active": false,
+            "basin_ids": [2,1,24],
+            "elev_range": [209000,210500],
+            "focus": [
+                [474540.289,6529853.139, 200.0],
+                [474540.289,6529853.139, 200.0]
+            ],
+            "height": 500,
+            "id": 2,
+            "name": "Egg Lake",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/egg_lk_1",
+            "perspective": 45.0,
+            "position": [
+                [473193.895,6531694.195],
+                [473813.040,6530888.324]
+            ]
+        },
+        {
+            "active": false,
+            "basin_ids": [1,2,24],
+            "elev_range": [209500,210500],
+            "focus": [
+                [476635.227,6524058.074,200.0],
+                [476635.227,6524058.074,200.0]
+            ],
+            "height": 500,
+            "id": 1,
+            "name": "PAD 33 - Egg Lake",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/egg_lk_2",
+            "perspective": 45.0,
+            "position": [
+                [476058.669,6522610.126],
+                [475242.970,6521643.736]
+            ]
+        },
+        {
+            "active": true,
+            "basin_ids": [5,4,6,24],
+            "elev_range": [209300,210300],
+            "focus": [
+                [475134.865,6520202.340,200.0],
+                [475134.865,6520202.340,200.0]
+            ],
+            "height": 500,
+            "id": 5,
+            "name": "Jerry's Lake",
+            "out_dir": "/home/rob/Desktop/ec/videos/output/jerrys_lake",
+            "perspective": 30.0,
+            "position": [
+                [477827.654,6520130.271],
+                [478568.007,6518335.078]
+            ]
+        },
+        {
+            "active": false,
+            "id": 24,
+            "name": "Peace/Athabasca/Slave River"
+        }
+    ],
+    "dem_file": "/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif",
+    "dem_name": "pad_dem_4m",
+    "elev_step": 1,
+    "out_pattern": "{n:04d}_{e}",
+    "precision": 3,
+    "res": 4.0,
+    "rgb_file": "/home/rob/Desktop/ec/videos/ortho.tif",
+    "rgb_name": "pad_ortho",
+    "size": [
+        1920,
+        1080
+    ],
+    "steps_per_elev": 3,
+    "zexag": 2
+}

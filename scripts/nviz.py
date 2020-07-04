@@ -11,7 +11,7 @@ A flood basin raster contains regions of contiguous integral values delineating 
 
 The basins are rendered over a LiDAR-derived terrain model with an RGB image draped over it.
 
-Viewpoints, targets, angles of view, etc. are configured for each video sequence.
+Viewpoints, targets, angles of view, etc. are configured for each video confuence.
 '''
 
 import os
@@ -22,10 +22,12 @@ import numpy as np
 import threading as th
 import traceback as tb
 import psycopg2 as pg
+import json
+import overlay
 
 # Debug mode. Makes only the first and last images
 # in coarse mode and always overwrites.
-debug = True
+debug = False
 
 # Set to true to overwrite existing outputs. Otherwise,
 # set to false and merely delete the images you want redone.
@@ -38,10 +40,7 @@ password = 'river'
 host = 'localhost'
 layer = 'spill_4m'
 
-# Rendermode. Coarse is useful for first-run checking.
-nviz_mode = 'fine' if not debug else 'coarse'
-
-# Sequence of render jobs. The params are:
+# Load the configuration file.
 # active: Set to true to run the job; false to ignore it.
 # name: A name for the job.
 # out_dir: The output directory for rendered imaged (*.ppm).
@@ -60,456 +59,16 @@ nviz_mode = 'fine' if not debug else 'coarse'
 # height: The height of the viewer above the model.
 # zexag: Z-exaggeration for elevations.
 # focus: The position of focus within the scene at the start and end. Will be graduated.
-# region: The computational region.
 # res: The grid resolution.
 # steps_per_elev: How many frames produced for each elevation step.
 # perspective: Angle of view.
-# color_table: Colour table for basins.
+# colour_table: Colour table for basins.
 # basin_ids: The basin IDs of interest. Determines the loading of spill paths.
-sequences = [
-        {
-                'active': False,
-                'name': 'Horseshoe Slough',
-                'out_dir': '/home/rob/Desktop/ec/videos/horseshoe_slough',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (209500, 211000),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((464641.750,6524696.567), (465237.964,6525004.502)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((466261.683,6525412.351, 200.), (466261.683,6525412.351, 200.)),
-                'region': (464632., 6530152., 474140., 6520368.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 40.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (16, 23)
-        },
-        {
-                'active': False,
-                'name': 'PAD 58/Lake 540',
-                'out_dir': '/home/rob/Desktop/ec/videos/pad58_lake540',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (209500, 212000),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((467267.384,6519997.290), (466749.792,6519387.972)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((468256., 6521197., 200.), (468656., 6521997., 200.)),
-                'region': (464564., 6526792., 474072., 6517004.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 30.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (17, 18, 23)
-        },
-        {
-                'active': False,
-                'name': 'Lake 50',
-                'out_dir': '/home/rob/Desktop/ec/videos/lake50',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (208500, 210000),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((482326.692,6522888.271), (481088.402,6522431.283)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((482025.309,6521859.638, 200.), (482356.175,6521360.064, 200.)),
-                'region': (476936., 6526864., 486444., 6517076.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 65.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (7, 21, 23),
-        },
-        {
-                'active': False,
-                'name': 'PAD 37 - Rocher Pond',
-                'out_dir': '/home/rob/Desktop/ec/videos/pad37',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (209000, 210300),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((484745.944,6521523.859), (484647.667,6521530.410)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((483671.449,6521432.133, 200), (483671.449,6521432.133, 200)),
-                'region': (476936., 6526864., 486444., 6517076.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 45.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (7, 21, 23),
-        },
-        {
-                'active': False,
-                'name': 'PAD 5b - Mud Lake',
-                'out_dir': '/home/rob/Desktop/ec/videos/pad5b',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (208500, 210500),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((478393.975,6516564.147), (478459.493,6516485.526)),
-                'height': 750,
-                'zexag': 2,
-                'focus': ((480359.515,6517193.120, 200), (480359.515,6517193.120, 200)),
-                'region': (474208., 6527604., 486584., 6512280.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 30.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (11, 14, 5, 15, 23),
-        },
-        {
-                'active': False,
-                'name': 'Lake 582',
-                'out_dir': '/home/rob/Desktop/ec/videos/lake582',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (208500, 210000),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((478810.014,6520457.553), (478652.771,6520791.695)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((479497.953,6519022.710, 200), (479347.262,6519350.300, 200)),
-                'region': (471424., 6525612., 486348., 6511684.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 30.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (14, 22, 23),
-        },
-        {
-                'active': False,
-                'name': 'Edwards Lake',
-                'out_dir': '/home/rob/Desktop/ec/videos/edwards_lk',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (209000, 210500),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((479897.613,6509537.344), (478705.186,6509275.272)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((481470.045,6509170.443, 200), (481024.522,6509668.379, 200)),
-                'region': (476596., 6513836., 490088., 6499824.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 45.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (9, 8, 22, 23),
-        },
-        {
-                'active': False,
-                'name': 'Flett Lake',
-                'out_dir': '/home/rob/Desktop/ec/videos/flett_lk',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (209000, 210500),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((482053.155,6510726.495), (482990.062,6511499.607)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((481679.702,6510333.387, 200), (481679.702,6510333.387, 200)),
-                'region': (465612., 6514632., 483444., 6498432.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 30.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (9, 8, 22, 23),
-        },
-        {
-                'active': False,
-                'name': 'Lake 565',
-                'out_dir': '/home/rob/Desktop/ec/videos/lake565',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (209500, 210500),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((479301.399,6515633.792), (478927.947,6513609.286)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((480664.173,6514873.783, 200), (480408.653,6514729.644, 200)),
-                'region': (473472., 6519164., 493212., 6499984.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 20.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (12, 11, 22, 23),
-        },
-        {
-                'active': False,
-                'name': 'Lake 577',
-                'out_dir': '/home/rob/Desktop/ec/videos/lake577',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (209500, 210500),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((477833.796,6522251.108), (477689.657,6521759.723)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((476988.614,6522631.113, 200), (477624.139,6521438.685, 200.)),
-                'region': (471720., 6527580., 483780., 6514684.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 45.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (1, 13, 15, 23),
-        },
-        {
-                'active': False,
-                'name': 'PAD 5/Spruce Island Lk.',
-                'out_dir': '/home/rob/Desktop/ec/videos/pad5',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (208780, 210500),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((470876.164,6521302.979), (471131.684,6521512.637)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((472370.825,6522942.630, 200.), (472370.825,6522942.630, 200.)),
-                'region': (468720., 6525296., 482852., 6514252.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 30.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (21, 24),
-        },
-        {
-                'active': False,
-                'name': 'W. Pushup Lk.',
-                'out_dir': '/home/rob/Desktop/ec/videos/w_pushup_lk',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (209200, 210200),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((470925.303,6520755.904), (470925.303,6519755.904)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((471702.542,6521419.337, 200), (472908.073,6521288.301, 200.)),
-                'region': (464908.,6525972., 479504.,6512348.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 45.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (4, 5, 6, 16, 24),
-        },
-        {
-                'active': False,
-                'name': 'Pushup Lk.',
-                'out_dir': '/home/rob/Desktop/ec/videos/pushup_lk',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (209400, 210400),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((477657.276,6516353.095), (476366.571,6512418.613)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((477340.364,6518942.757, 200), (477340.364,6518942.757, 200.)),
-                'region': (467136.,6523096., 481660.,6510460.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 30.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (5, 6, 16, 24),
-        },
-        {
-                'active': False,
-                'name': 'Pete\'s Ck.',
-                'out_dir': '/home/rob/Desktop/ec/videos/petes_ck',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (209300, 210300),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((469546.149,6527118.424), (470723.048,6527618.424)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((471057.189,6534156.033, 200), (470454.424,6533907.065, 200.)),
-                'region': (464645.845,6538435.483, 480924.639,6527387.088),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 30.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (22, 24),
-        },
-        {
-                'active': False,
-                'name': 'Arden\'s Slough',
-                'out_dir': '/home/rob/Desktop/ec/videos/ardens_slough',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (209500, 211000),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((474297.327,6525976.217), (477797.327,6525976.217)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((473786.286,6527301.623, 200), (473786.286,6527301.623, 200.)),
-                'region': (466372.,6532020., 477256.,6520912.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 45.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (20, 23),
-        },
-        {
-                'active': False,
-                'name': 'Egg Lake',
-                'out_dir': '/home/rob/Desktop/ec/videos/egg_lk_1',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (209500, 210500),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((476665.119,6521302.531), (475695.453,6522350.818)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((476403.047,6523661.178, 200), (476403.047,6523661.178, 200.)),
-                'region': (473009.,6530891., 482260.,6521797.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 45.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (2, 14, 24),
-        },
-        {
-                'active': True,
-                'name': 'Jerry\'s Lake',
-                'out_dir': '/home/rob/Desktop/ec/videos/jerrys_lake',
-                'out_pattern': '{e}_{n}',
-                'basin_dir': '/home/rob/Desktop/ec/videos/4m/r',
-                'basin_pattern': '{e}.tif',
-                'dem_file': '/home/rob/Desktop/ec/final_p10_4m_clipped_fill_min.tif',
-                'dem_name': 'pad_dem_4m',
-                'rgb_file': '/home/rob/Desktop/ec/videos/ortho.tif',
-                'rgb_name': 'pad_ortho',
-                'elev_range': (209300, 210300),
-                'elev_step': 1,
-                'precision': 3,
-                'size': (1920, 1080),
-                'position': ((475446.317,6520885.470), (476136.439,6520256.497)),
-                'height': 500,
-                'zexag': 2,
-                'focus': ((475424.236,6520409.132, 200), (475424.236,6520409.132, 200.)),
-                'region': (463516.,6525028., 481908.,6510976.),
-                'res': 4.,
-                'steps_per_elev': 3,
-                'perspective': 30.,
-                'color_table': '/home/rob/Desktop/ec/videos/color.txt',
-                'basin_ids': (4, 5, 6, 14, 24),
-        }
-]
+# region_radius: The grass region is a square centred on the first focus with this radius.
+
+with open('config.json', 'r') as f:
+    config = json.loads(f.read())
+
 
 class Job(th.Thread):
     '''
@@ -530,13 +89,13 @@ class Job(th.Thread):
         '''
         while len(self.queue):
             # Extract configs from the queue.
-            elev, frame, frames, basin, basin_elev, out_tpl, steps, seq = self.queue.pop(0)
-            if overwrite or debug or not has_file(elev, frame, **seq):
+            elev, frame, frames, basin, basin_elev, out_tpl, steps, conf = self.queue.pop(0)
+            if overwrite or debug or not has_file(elev, frame, **conf):
                 try:
                     # Load the basin rasters.
-                    load_basin(self.tid, elev, basin, basin_elev, **seq)
+                    load_basin(self.tid, elev, basin, basin_elev, **conf)
                     # Render the scene.
-                    render_scene(self.tid, elev, frame, frames, basin, basin_elev, out_tpl, steps, **seq)
+                    render_scene(self.tid, elev, frame, frames, basin, basin_elev, out_tpl, steps, **conf)
                 except Exception as e:
                     print(tb.format_exc())
                     break
@@ -546,51 +105,78 @@ def run():
     Entry point. Run all the jobs.
     '''
 
-    # Iterate over active sequences.
-    for seq in sequences:
-        if not seq['active']:
+    # Iterate over active confuences.
+    for conf in config['configs']:
+
+        # Skip inactive.
+        if not conf['active']:
             continue
 
-        print('Processing {n}'.format(n = seq['name']))
+        # Copy the global configs into the config item (but not the configs list).
+        for k, v in config.items():
+            if k != 'configs':
+                conf[k] = v
 
-        # Prepare output dir and load the basemaps.
-        create_out_dir(**seq)
-        load_basemap(**seq)
+        focus = conf['focus']
+        region_radius = conf['region_radius']
+        region = (
+            focus[0][0] - region_radius, 
+            focus[0][1] + region_radius, 
+            focus[0][0] + region_radius,
+            focus[0][1] - region_radius
+        )
+        conf['region'] = region
 
-        # Prepare start, end and counters.
-        elev, elev_end = seq['elev_range']
-        step = seq['elev_step']
-        steps = int(math.ceil(float(elev_end - elev) / step))
-        spe = seq['steps_per_elev']
+        print('Processing', conf['name'])
 
-        # Prepare the output file template.
-        out_tpl = os.path.join(seq['out_dir'], seq['out_pattern'])
+        if True:
+            # Prepare output dir and load the basemaps.
+            create_out_dir(**conf)
+            load_basemap(**conf)
 
-        # Prepare frame counter.
-        frame = 1
-        frames = steps * spe
+            # Prepare start, end and counters.
+            elev, elev_end = conf['elev_range']
+            step = conf['elev_step']
+            steps = int(math.ceil(float(elev_end - elev) / step))
+            spe = conf['steps_per_elev']
 
-        # Create the list of job configurations.
-        jobs = []
-        while elev <= elev_end:
-            jobs.append((elev, frame, frames, 'basin_{id}', 'basin_elev_{id}', out_tpl, steps, seq))
-            frame += spe
-            elev += step
+            # Prepare the output file template.
+            out_tpl = os.path.join(conf['out_dir'], conf['out_pattern'])
 
-        # Keep the first and last for debugging.
-        if debug:
-            jobs = jobs[:spe] + jobs[-spe:]
+            # Prepare frame counter.
+            frame = 1
+            frames = steps * spe
 
-        # Run the jobs and wait for completion.
-        # Using threads here because the work happens native code and the GIL
-        # helps us here by managing the queue's access.
-        numthreads = 2
-        threads = []
-        for i in range(numthreads):
-            threads.append(Job(i, jobs))
-            threads[i].start()
-        for i in range(numthreads):
-            threads[i].join()
+            # Create the list of job configurations.
+            jobs = []
+            while elev <= elev_end:
+                jobs.append((elev, frame, frames, 'basin_{id}', 'basin_elev_{id}', out_tpl, steps, conf))
+                frame += spe
+                elev += step
+
+            # Keep the first and last for debugging.
+            if debug:
+                jobs = jobs[:spe] + jobs[-spe:]
+
+            # Run the jobs and wait for completion.
+            # Using threads here because the work happens native code and the GIL
+            # helps us here by managing the queue's access.
+            numthreads = 2
+            threads = []
+            for i in range(numthreads):
+                threads.append(Job(i, jobs))
+                threads[i].start()
+            for i in range(numthreads):
+                threads[i].join()
+
+        if not debug:
+            # Use the out dir name as the name of the vid.
+            out_dir = conf['out_dir']
+            vid_name = os.path.basename(out_dir)
+            overlay.run(out_dir, out_dir, conf['colour_table'], conf['id'])
+            os.system('ffmpeg -pattern_type glob -i "{out_dir}/*.png" {out_dir}/{name}.mp4'.format(
+                out_dir = out_dir, name = vid_name)
+            )
 
 def e_to_filename(elev, precision, elev_step):
     '''
@@ -601,14 +187,14 @@ def e_to_filename(elev, precision, elev_step):
     #return str(int(round(elev * es) * (precision / es)))
     return str(int(elev))
 
-def has_file(elev, frame, precision, elev_step, steps_per_elev, out_dir, **seq):
+def has_file(elev, frame, precision, elev_step, steps_per_elev, out_dir, **conf):
     '''
-    See if the sequence of files associated with the given elevation
+    See if the confuence of files associated with the given elevation
     already exists. If any of the files is missing, all will be redone.
     '''
     e = e_to_filename(elev, precision, elev_step)
     for i in range(frame, frame + steps_per_elev):
-        f = os.path.join(out_dir, '{0}_{1}.ppm'.format(e, i))
+        f = os.path.join(out_dir, '{}_{}.ppm'.format(i, e)) # TODO: This should match the configurable pattern.
         if not os.path.exists(f):
             return False
     return True
@@ -653,18 +239,15 @@ def get_position(px, py, height, zexag, region):
     gs_unit_size = 1000.
     rng = 5. * gs_unit_size
     rng_off = 2. * gs_unit_size
-    try:
-        w = abs(region[2] - region[0])
-        h = abs(region[3] - region[1])
-        longdim = max(w, h)
-        scale = gs_unit_size / longdim
-        mx = (px - region[0]) * scale
-        my = (region[1] - py) * scale
-        dx = (mx + rng_off) / rng
-        dy = (my + rng_off) / rng
-        #print(dx, dy, w, h, scale, mx, my, longdim, gs_unit_size, rng, rng_off)
-    except:
-        print(tb.format_exc())
+    w = abs(region[2] - region[0])
+    h = abs(region[3] - region[1])
+    longdim = max(w, h)
+    scale = gs_unit_size / longdim
+    mx = (px - region[0]) * scale
+    my = (region[1] - py) * scale
+    dx = (mx + rng_off) / rng
+    dy = (my + rng_off) / rng
+    #print(dx, dy, w, h, scale, mx, my, longdim, gs_unit_size, rng, rng_off)
     return dx, dy
 
 def create_out_dir(out_dir, **kwargs):
@@ -702,12 +285,12 @@ def load_basemap(dem_file, dem_name, rgb_file, rgb_name, region, res, **kwargs):
     print('Setting region to:', region)
 
     # Set the bounding region.
-    cmd = 'g.region --overwrite --verbose align={r} n={n} w={w} e={e} s={s} res={res}'.format(
+    cmd = 'g.region --overwrite --verbose align={r} n={n:0.5f} w={w:0.5f} e={e:0.5f} s={s:0.5f} res={res}'.format(
         r = dem_name, w = region[0], n = region[1], e = region[2], s = region[3], res = res
     )
     os.system(cmd)
 
-def load_basin(tid, elev, basin_name, basin_name_elev, basin_dir, basin_pattern, precision, elev_step, color_table, **kwargs):
+def load_basin(tid, elev, basin_name, basin_name_elev, basin_dir, basin_pattern, precision, elev_step, colour_table, **kwargs):
     '''
     Load the basin raster and apply the colour table.
     Create an elevation layer to position it vertically.
@@ -726,7 +309,7 @@ def load_basin(tid, elev, basin_name, basin_name_elev, basin_dir, basin_pattern,
     os.system('r.in.gdal --overwrite input={i} output={o}'.format(i = f, o = basin_name))
 
     # Set the color table.
-    os.system('r.colors map={r} rules={c}'.format(r = basin_name, c = color_table))
+    os.system('r.colors map={r} rules={c}'.format(r = basin_name, c = colour_table))
 
     # We create a raster with the elevation lower than the desired elevation
     # everywhere except where there are valid pixels. There, we raise the pixels
@@ -794,7 +377,7 @@ def load_conn(tid, name, basins, elevation):
 
 def render_scene(tid, elev, frame, frames, basin_name, basin_name_elev, out_tpl, steps,
         dem_name, rgb_name, position, focus, size, zexag, precision, elev_step, steps_per_elev,
-        dem_file, height, perspective, basin_ids, region, **kwargs):
+        dem_file, height, perspective, basin_ids, region, nviz_mode, **kwargs):
     '''
     Render the 3D image in m.nviz.image.
     '''
@@ -805,8 +388,6 @@ def render_scene(tid, elev, frame, frames, basin_name, basin_name_elev, out_tpl,
     basin_name = basin_name.format(id = tid)
     basin_name_elev = basin_name_elev.format(id = tid)
     e = e_to_filename(elev, precision, elev_step)
-
-    #rregion = get_raster_bounds(gdal.Open(dem_file))
 
     # Start, end position and focus.
     foc0 = get_focus(focus[0][0], focus[0][1], focus[0][2], region)
@@ -844,6 +425,10 @@ def render_scene(tid, elev, frame, frames, basin_name, basin_name_elev, out_tpl,
         print('Rendering', out_file)
         print('Pos', pos, '; Foc', foc)
 
+        if not overwrite and os.path.exists(out_file):
+            print('Exists')
+            continue            
+
         # Main part of the command.
         cmd = '''m.nviz.image -a --verbose --overwrite \
                         elevation_map={dem},{basin} \
@@ -864,9 +449,9 @@ def render_scene(tid, elev, frame, frames, basin_name, basin_name_elev, out_tpl,
                 'dem_color' : rgb_name,
                 'basin' : basin_name_elev,
                 'basin_color' :basin_name,
-                'position' : '{0[0]},{0[1]}'.format(pos),
-                'focus' : '{0[0]},{0[1]},{0[2]}'.format(foc),
-                'size' : '{0[0]},{0[1]}'.format(size),
+                'position' : '{0[0]:0.5f},{0[1]:0.5f}'.format(pos),
+                'focus' : '{0[0]:0.5f},{0[1]:0.5f},{0[2]:0.5f}'.format(foc),
+                'size' : '{0[0]:d},{0[1]:d}'.format(size),
                 'height' : height,
                 'zexag' : zexag,
                 'persp' : perspective,

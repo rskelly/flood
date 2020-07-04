@@ -8,18 +8,9 @@ import sys
 import os
 import math
 import cairo
+import json
 import multiprocessing as mp
 
-try:
-    in_file = sys.argv[1]
-    out_file = sys.argv[2]
-    ids = list(map(int, sys.argv[3].split(',')))
-except:
-    print('Usage: <in file> <out file> <basin id,[basin id,[basin id,...]]>')
-    sys.exit(1)
-
-sky_file = '/home/rob/Desktop/ec/videos/sky/201908font_size_122718.jpg'
-colour_file = '/home/rob/Desktop/ec/videos/color.txt'
 font = '/usr/share/fonts/type1/gsfonts/p052003l.pfb'
 
 # Panel size.
@@ -29,33 +20,7 @@ pad = 10
 
 font_size = 24
 
-# Basin ID->label mapping.
-panels = {
-        1: ('Egg Lk./PAD33',),
-        2: ('Egg Lake',),
-        3: ('Arden\'s Slough',),
-        4: ('W. Pushup Lake',),
-        5: ('Jerry\'s Lake',),
-        6: ('Pushup Lake',),
-        7: ('Lake 50',),
-        8: ('Flett Lake',),
-        9: ('Edward\'s Lake',),
-        12: ('Mud Lake/PAD5b',),
-        13: ('Lake 565',),
-        14: ('Lake 577',),
-        15: ('Lake 582',),
-        16: ('S. Pushup Lake',),
-        18: ('Horseshoe Slough',),
-        19: ('Lake 540',),
-        20: ('PAD 58',),
-        21: ('Spruce I. Lk./PAD5',),
-        22: ('Pete\'s Ck./PAD15',),
-        23: ('Rocher Pond',),
-        24: ('Peace/Athabasca/Slave River',),
-        25: ('Slave River',),
-}
-
-def load_colours():
+def load_colours(colour_file):
     '''
     Load the colours from the GRASS colour map.
     Convert to float values.
@@ -69,32 +34,6 @@ def load_colours():
                 colours[int(i)] = (r / 255., g / 255., b / 255.)
         except: pass
     return colours
-
-def do_sky():
-    '''
-    Load and render the sky image. Looks pretty lame.
-    '''
-
-    sky = Image.open(sky_file).convert(mode = 'RGBA')
-    im = Image.open(in_file).convert(mode = 'RGBA')
-
-    ic, ir = im.size
-
-    sky0 = sky.resize(im.size)
-
-    idata = im.getdata()
-    idata0 = []
-
-    for r, g, b, a in idata:
-        if r == 255 and g == 255 and b == 255:
-            idata0.append((255, 255, 255, 0))
-        else:
-            idata0.append((r, g, b, 255))
-
-    im.putdata(idata0)
-
-    comp = Image.alpha_composite(sky0, im)
-    comp.save(out_file, 'PNG')
 
 def basin_panel(ctx, name, width, height, pad, colour):
     '''
@@ -145,22 +84,22 @@ def elev_panel(ctx, elev, width, height, pad):
     ctx.set_source_rgb(0, 0, 0)
     ctx.show_text(t)
 
-def text_width(ctx, ids):
+def text_width(ctx, ids, panels):
     '''
     Get the maximum text width for each of the panel names, given the id list.
     '''
     ctx.set_font_size(font_size)
     w = width
     for id_ in ids:
-        w = max(w, ctx.text_extents(panels[id_][0]).width)
+        w = max(w, ctx.text_extents(panels[id_]['name']).width)
     return w
 
-def job(infiles, outdir, ids):
+def job(infiles, outdir, colour_file, ids, panels):
     '''
     Process the image.
     '''
     # Load the colours
-    colours = load_colours()
+    colours = load_colours(colour_file)
 
     for infile in infiles:
 
@@ -173,8 +112,9 @@ def job(infiles, outdir, ids):
             continue
 
         # Get the elevation from the filename.
-        f = os.path.basename(infile)
-        e = float(f[:6]) / 1000.
+        f = os.path.splitext(os.path.basename(infile))[0]
+        parts = f.split('_') # TODO: Match the pattern from nviz.
+        e = float(parts[1]) / 1000.
 
         # If the image is not a png convert it as a tmp.
         tmp = '/tmp/overlay_{}.png'.format(os.getpid())
@@ -187,14 +127,14 @@ def job(infiles, outdir, ids):
         ctx = cairo.Context(inimg)
 
         # Get the maximum text width.
-        tw = text_width(ctx, ids) + height + pad
-    
+        tw = text_width(ctx, ids, panels) + height + pad
+
         # Translate to start the panel drawing in the bottom left.
         ctx.translate(height / 2, inimg.get_height() - (len(ids) + 1) * height - height / 2)
 
         # Do the legend panels.
         for id_ in ids:
-            name, = panels[id_]
+            name = panels[id_]['name']
             colour = colours[id_]
             basin_panel(ctx, name, tw, height, pad, colour)
             ctx.translate(0, height)
@@ -205,13 +145,28 @@ def job(infiles, outdir, ids):
         # Write.
         inimg.write_to_png(outfile)
 
-def run(indir, outdir, ids):
+def run(indir, outdir, colour_file, bid):
+    panels = {}
+    ids = None
+    with open('config.json', 'r') as f:
+        config = json.loads(f.read())
+        for conf in config['configs']:
+            if conf['id'] == bid:
+                ids = conf['basin_ids']
+                break
+        for conf in config['configs']:
+            if conf['id'] in ids:
+                for k, v in config.items():
+                    if k != 'configs':
+                        conf[k] = v
+                panels[conf['id']] = conf
 
     print('Spawning processes')
 
     mp.set_start_method('spawn')
 
     files = []
+
     for f in [x for x in os.listdir(indir) if x.endswith('.ppm')]:
         files.append(os.path.join(indir, f))
 
@@ -219,12 +174,22 @@ def run(indir, outdir, ids):
     procs = []
     for t in range(ts):
         files_ = files[t * int(len(files) / 4):(t+1) * int(len(files) / 4)]
-        procs.append(mp.Process(target = job, args = (files_, outdir, ids)))
+        procs.append(mp.Process(target = job, args = (files_, outdir, colour_file, ids, panels)))
         procs[t].start()
 
     for t in range(ts):
         procs[t].join()
 
 if __name__ == '__main__':
-    run(in_file, out_file, ids)
+    try:
+        in_file = sys.argv[1]
+        out_file = sys.argv[2]
+        colour_file = sys.argv[3]
+        bid = int(sys.argv[4])
 
+        run(in_file, out_file, colour_file, bid)
+
+    except Exception as e:
+        print(e)
+        print('Usage: <in file> <out file> <colour file> <basin id,[basin id,[basin id,...]]>')
+        sys.exit(1)
