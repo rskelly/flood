@@ -32,7 +32,7 @@
 void usage() {
 	std::cerr << "Usage: flood <options>\n"
 			<< " -i <file>            Input elevation raster.\n"
-			<< " -s <file>            CSV containing seed points. Row format, ID, X, Y. If not given, minima are used.\n"
+			<< " -s <file>            CSV containing seed points. Row format: gid, x, y, priority. If not given, minima are used.\n"
 			<< " -dbc <conn>          The database connection string for output vectors.\n"
 			<< " -dbl <layer>         The basin database layer name.\n"
 			<< " -dbi <field>         The basin database ID field.\n"
@@ -170,11 +170,14 @@ int main(int argc, char **argv) {
 	}
 
 	if(!bconn.empty()) {
+		if(!Band<float>::checkConnection(bconn))
+			g_runerr("Connection failed to " << bconn);
 		BasinDBOutput* db = dynamic_cast<BasinDBOutput*>(basinOutput = new BasinDBOutput());
 		db->conn = bconn;
 		db->layer = blayer;
 		db->idField = bid;
 		db->elevationField = belev;
+
 	} else if(!vdir.empty()){
 		BasinFileOutput* db = dynamic_cast<BasinFileOutput*>(basinOutput = new BasinFileOutput());
 		db->vdir = vdir;
