@@ -381,6 +381,8 @@ Flood::Flood(const std::string& input, int band, bool overwrite,
 			m_spillOutput(spillOutput),
 			m_input(input),
 			m_fseeds(seeds),
+			m_smoothAlpha(0),
+			m_smoothRadius(0),
 			cancel(false) {
 	m_breakLines = breakLines;
 }
@@ -651,7 +653,7 @@ int Flood::fillBasins(Band<int>& basinRaster, float elevation) {
 		} else if(area > 0){
 			//g_debug("Bad Seed: " << seed.col() << ", " << seed.row() << "; elevation: " << elevation << "; basin area: " << barea);
 			// If the basin is too small, fill it with nodata. Do not collect more spill points.
-			TargetFillOperator<int, int> fop(&basinRaster, 0, &basinRaster, 0, seed.cellId(), basinRaster.props().nodata());
+			TargetFillOperator<int, int> fop(&basinRaster, &basinRaster, seed.cellId(), basinRaster.props().nodata());
 			Band<int>::floodFill(seed.col(), seed.row(), fop, true, &minc, &minr, &maxc, &maxr, &area);
 		}
 
@@ -680,12 +682,12 @@ bool Flood::findSpillPoints(Band<int>& basinRaster, float elevation) {
 			int id1 = b1.seedId();
 
 			if(trees.find(id0) == trees.end()) {
-				std::unique_ptr<mqtree<Cell>> t(new mqtree<Cell>(bounds.minx(), bounds.miny(), bounds.maxx(), bounds.maxy()));
+				std::unique_ptr<mqtree<Cell>> t(new mqtree<Cell>(bounds.minx(), bounds.miny(), bounds.maxx(), bounds.maxy(), 1000));
 				b0.computeEdges(basinRaster, *t);
 				trees.emplace(id0, std::move(t));
 			}
 			if(trees.find(id1) == trees.end()) {
-				std::unique_ptr<mqtree<Cell>> t(new mqtree<Cell>(bounds.minx(), bounds.miny(), bounds.maxx(), bounds.maxy()));
+				std::unique_ptr<mqtree<Cell>> t(new mqtree<Cell>(bounds.minx(), bounds.miny(), bounds.maxx(), bounds.maxy(), 1000));
 				b1.computeEdges(basinRaster, *t);
 				trees.emplace(id1, std::move(t));
 			}
