@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+
 '''
 *** This program must be run in a GRASS GIS environment. ***
 
@@ -25,21 +26,6 @@ import psycopg2 as pg
 import json
 import overlay
 
-# Debug mode. Makes only the first and last images
-# in coarse mode and always overwrites.
-debug = False
-
-# Set to true to overwrite existing outputs. Otherwise,
-# set to false and merely delete the images you want redone.
-overwrite = True
-
-# Database connection parameters for vectors.
-dbname = 'ec'
-user = 'rob'
-password = 'river'
-host = 'localhost'
-layer = 'spill_4m'
-
 # Load the configuration file.
 # active: Set to true to run the job; false to ignore it.
 # name: A name for the job.
@@ -56,7 +42,7 @@ layer = 'spill_4m'
 # precision: The precision of elevations. Each configured elev is the real elev * 10^precision.
 # size: The size of the output images.
 # position: The position of the viewer above the model in model coordinates at start and end. Will be graduated.
-# height: The height of the viewer above the model.
+# height: The height of the viewer above the model. Array for start and end.
 # zexag: Z-exaggeration for elevations.
 # focus: The position of focus within the scene at the start and end. Will be graduated.
 # res: The grid resolution.
@@ -90,12 +76,13 @@ class Job(th.Thread):
         while len(self.queue):
             # Extract configs from the queue.
             elev, frame, frames, basin, basin_elev, out_tpl, steps, conf = self.queue.pop(0)
-            if overwrite or debug or not has_file(elev, frame, **conf):
+            # If overwrite or debug is configured or the file doesn't exist, proceed.
+            if conf.get('overwrite', False) or conf.get('debug', False) or not has_file(elev, frame, out_tpl):
                 try:
                     # Load the basin rasters.
-                    load_basin(self.tid, elev, basin, basin_elev, **conf)
+                    has_basin = load_basin(self.tid, elev, basin, basin_elev, **conf)
                     # Render the scene.
-                    render_scene(self.tid, elev, frame, frames, basin, basin_elev, out_tpl, steps, **conf)
+                    render_scene(has_basin, self.tid, elev, frame, frames, basin, basin_elev, out_tpl, steps, **conf)
                 except Exception as e:
                     print(tb.format_exc())
                     break
@@ -105,6 +92,10 @@ def run():
     Entry point. Run all the jobs.
     '''
 
+    #for f in range(1, 3900, 10):
+    #    test_f(f, 3900)
+    #return
+
     # Iterate over active confuences.
     for conf in config['configs']:
 
@@ -112,9 +103,9 @@ def run():
         if not conf['active']:
             continue
 
-        # Copy the global configs into the config item (but not the configs list).
+        # Copy the global configs into the config item (but not the configs list itself).
         for k, v in config.items():
-            if k != 'configs':
+            if k != 'configs' and not k in conf.keys():
                 conf[k] = v
 
         focus = conf['focus']
@@ -147,21 +138,27 @@ def run():
             frame = 1
             frames = steps * spe
 
+            test = []
+
             # Create the list of job configurations.
             jobs = []
             while elev <= elev_end:
                 jobs.append((elev, frame, frames, 'basin_{id}', 'basin_elev_{id}', out_tpl, steps, conf))
                 frame += spe
                 elev += step
+                test.append(elev)
+
+            #print(len(test))
+            #sys.exit(1)
 
             # Keep the first and last for debugging.
-            if debug:
+            if conf['debug']:
                 jobs = jobs[:spe] + jobs[-spe:]
 
             # Run the jobs and wait for completion.
             # Using threads here because the work happens native code and the GIL
             # helps us here by managing the queue's access.
-            numthreads = 2
+            numthreads = conf['threads']
             threads = []
             for i in range(numthreads):
                 threads.append(Job(i, jobs))
@@ -169,14 +166,16 @@ def run():
             for i in range(numthreads):
                 threads[i].join()
 
-        if not debug:
-            # Use the out dir name as the name of the vid.
-            out_dir = conf['out_dir']
-            vid_name = os.path.basename(out_dir)
-            overlay.run(out_dir, out_dir, conf['colour_table'], conf['id'])
-            os.system('ffmpeg -pattern_type glob -i "{out_dir}/*.png" {out_dir}/{name}.mp4'.format(
-                out_dir = out_dir, name = vid_name)
-            )
+#        if not debug:
+#            # Use the out dir name as the name of the vid.
+#            out_dir = conf['out_dir']
+#            vid_name = os.path.basename(out_dir)
+#            overlay.run(out_dir, out_dir, conf['colour_table'], conf['id'], overwrite)
+#            vid_file = os.path.join(out_dir, '{}.mp4'.format(vid_name))
+#            if overwrite or not os.path.exists(vid_file):
+#            os.system('ffmpeg -y -pattern_type glob -i "{out_dir}/*.png" {vid_file}'.format(
+#                out_dir = out_dir, vid_file = vid_file)
+#            )
 
 def e_to_filename(elev, precision, elev_step):
     '''
@@ -187,17 +186,19 @@ def e_to_filename(elev, precision, elev_step):
     #return str(int(round(elev * es) * (precision / es)))
     return str(int(elev))
 
-def has_file(elev, frame, precision, elev_step, steps_per_elev, out_dir, **conf):
+def has_file(elev, frame, out_tpl): #precision, elev_step, steps_per_elev, out_dir, out_pattern, **conf):
     '''
     See if the confuence of files associated with the given elevation
     already exists. If any of the files is missing, all will be redone.
     '''
-    e = e_to_filename(elev, precision, elev_step)
-    for i in range(frame, frame + steps_per_elev):
-        f = os.path.join(out_dir, '{}_{}.ppm'.format(i, e)) # TODO: This should match the configurable pattern.
-        if not os.path.exists(f):
-            return False
-    return True
+    out_file = out_tpl.format(e = elev, n = frame) + '.ppm'
+    return os.path.exists(out_file)
+#    e = e_to_filename(elev, precision, elev_step)
+#    for i in range(frame, frame + steps_per_elev):
+#        f = os.path.join(out_dir, (out_pattern  + '.ppm').format(n = i, e = e)) 
+#        if not os.path.exists(f):
+#            return False
+#    return True
 
 def get_raster_value(ds, band, x, y):
     '''
@@ -261,23 +262,34 @@ def create_out_dir(out_dir, **kwargs):
             os.path.unlink(os.path.join(out_dir, f))
         except: pass
 
-def load_basemap(dem_file, dem_name, rgb_file, rgb_name, region, res, **kwargs):
+def load_basemap(dem_name, rgb_file, rgb_name, region, res, overwrite, **kwargs):
     '''
     Load the dem and ortho, composite the ortho.
     '''
+    print(kwargs)
+    dem_file = None
+    dem_map = kwargs.get('dem_map', False)
+    if not dem_map:
+        dem_file = kwargs.get('dem_file', False)
+        if not dem_file:
+            raise Exception('No dem_map or dem_file given.')
 
-    print('Loading basemap:', dem_file, 'as', dem_name)
+    print('Loading basemap:', dem_file, dem_name, 'as', dem_name)
 
     # Load dem if not exists.
     try:
-        os.system('r.in.gdal input={i} output={o}'.format(i = dem_file, o = dem_name))
-    except: pass
+        if dem_file:
+            os.system('r.in.gdal {ow}input={i} output={o}'.format(i = dem_file, o = dem_name, ow = '--overwrite ' if overwrite else ''))
+        else:
+            os.system('g.copy --overwrite raster={i},{o}'.format(i = dem_map, o = dem_name))
+    except e as Exception:
+        print(e)
 
     print('Loading ortho:', rgb_file, 'as', rgb_name)
 
     # Load rgb if not exists
     try:
-        os.system('r.in.gdal input={i} output={o}'.format(i = rgb_file, o = rgb_name))
+        os.system('r.in.gdal --overwrite input={i} output={o}'.format(i = rgb_file, o = rgb_name))
         os.system('g.region raster={r}.red'.format(r = rgb_name))
         os.system('r.composite -c red={r}.red green={r}.green blue={r}.blue levels=32 output={r}'.format(r = rgb_name))
     except: pass
@@ -290,10 +302,12 @@ def load_basemap(dem_file, dem_name, rgb_file, rgb_name, region, res, **kwargs):
     )
     os.system(cmd)
 
-def load_basin(tid, elev, basin_name, basin_name_elev, basin_dir, basin_pattern, precision, elev_step, colour_table, **kwargs):
+def load_basin(tid, elev, basin_name, basin_name_elev, basin_dir, basin_pattern, precision, elev_step, colour_table, overwrite, **kwargs):
     '''
     Load the basin raster and apply the colour table.
     Create an elevation layer to position it vertically.
+
+    Return true if the basin exists in GRASS, false otherwise.
     '''
 
     # Create an elevation model for the basin raster.
@@ -305,21 +319,30 @@ def load_basin(tid, elev, basin_name, basin_name_elev, basin_dir, basin_pattern,
     f = os.path.join(basin_dir, basin_pattern.format(e = e))
     print('Loading basin', f, '-->', basin_name)
 
-    # Load the file.
-    os.system('r.in.gdal --overwrite input={i} output={o}'.format(i = f, o = basin_name))
+    # If the file doesn't exist, we delete the basin and return false.
+    if not os.path.exists(f):
+        
+        os.system('g.remove -f type=raster pattern={f}'.format(f = basin_name))
+        return False
 
-    # Set the color table.
-    os.system('r.colors map={r} rules={c}'.format(r = basin_name, c = colour_table))
+    else:
 
-    # We create a raster with the elevation lower than the desired elevation
-    # everywhere except where there are valid pixels. There, we raise the pixels
-    # above the desired elevation to avoid occlusion (somewhat).
-    p = pow(10., float(precision))
-    os.system('r.mapcalc --overwrite expression="{o} = ({elev} - {e}) + ({b} > 0) * {e}"'.format(
+        # Load the file.
+        os.system('r.in.gdal --overwrite input={i} output={o}'.format(i = f, o = basin_name))
+
+        # Set the color table.
+        os.system('r.colors map={r} rules={c}'.format(r = basin_name, c = colour_table))
+
+        # We create a raster with the elevation lower than the desired elevation
+        # everywhere except where there are valid pixels. There, we raise the pixels
+        # 2*e above the desired elevation to avoid occlusion (somewhat).
+        p = pow(10., float(precision))
+        os.system('r.mapcalc --overwrite expression="{o} = ({elev} - {e}) + ({b} > 0) * ({e} * 2)"'.format(
             elev = elev / p, e = 2., b = basin_name, o = basin_name_elev)
-    )
+        )
+        return True
 
-def load_conn(tid, name, basins, elevation):
+def load_conn(tid, name, basins, elevation, dbname, user, password, host, layer):
     '''
     Load the connection vectors for the basins.
     '''
@@ -375,7 +398,18 @@ def load_conn(tid, name, basins, elevation):
 
     return True
 
-def render_scene(tid, elev, frame, frames, basin_name, basin_name_elev, out_tpl, steps,
+def test_f(frame, frames):
+        try:
+            # A logarithmic decay towards 1 for x=0->1
+            p = (float(frame - 1) / frames)
+            frame_p = 1. + math.log(p, 10.) / 7.
+        except Exception as e:
+            print(e)
+            frame_p = 0.
+
+        print('frame_p', frame_p, p, frame, frames)
+
+def render_scene(has_basin, tid, elev, frame, frames, basin_name, basin_name_elev, out_tpl, steps,
         dem_name, rgb_name, position, focus, size, zexag, precision, elev_step, steps_per_elev,
         dem_file, height, perspective, basin_ids, region, nviz_mode, **kwargs):
     '''
@@ -390,31 +424,44 @@ def render_scene(tid, elev, frame, frames, basin_name, basin_name_elev, out_tpl,
     e = e_to_filename(elev, precision, elev_step)
 
     # Start, end position and focus.
+    h0, h1 = height
     foc0 = get_focus(focus[0][0], focus[0][1], focus[0][2], region)
     foc1 = get_focus(focus[1][0], focus[1][1], focus[1][2], region)
-    pos0 = get_position(*position[0], height, zexag, region)
-    pos1 = get_position(*position[1], height, zexag, region)
+    pos0 = get_position(*position[0], h0, zexag, region)
+    pos1 = get_position(*position[1], h1, zexag, region)
 
     # Load the connection lines.
     spill_name = 'spill_{}'.format(tid)
-    load_conn(tid, spill_name, basin_ids, elevation)
+    load_conn(tid, spill_name, basin_ids, elevation, kwargs['dbname'], kwargs['user'], kwargs['password'], kwargs['host'], kwargs['layer'])
+
+    log_p = 0.
 
     # Iterate over the frames for this elevation step.
     for s in range(steps_per_elev):
 
         # The completion proportion, 0 - 1.
-        frame_p = float(frame - 1) / frames
+        p = (float(frame - 1) / frames)
+        try:
+            # A logarithmic decay towards 1 for x=0->1
+            #log_p = 1. + math.log(p, 10.) / 7.
+            log_p = 1. - (1. - p)**5.
+        except Exception as e:
+            print(e)
+            log_p = 0.
 
+        print('p', p, log_p, frame, frames)
+        
         # Current position, focus and perspective.
         pos = (
-                pos0[0] + (pos1[0] - pos0[0]) * frame_p,
-                pos0[1] + (pos1[1] - pos0[1]) * frame_p
+                pos0[0] + (pos1[0] - pos0[0]) * log_p,
+                pos0[1] + (pos1[1] - pos0[1]) * log_p
         )
         foc = (
-                foc0[0] + (foc1[0] - foc0[0]) * frame_p,
-                foc0[1] + (foc1[1] - foc0[1]) * frame_p,
-                foc0[2] + (foc1[2] - foc0[2]) * frame_p
+                foc0[0] + (foc1[0] - foc0[0]) * log_p,
+                foc0[1] + (foc1[1] - foc0[1]) * log_p,
+                foc0[2] + (foc1[2] - foc0[2]) * log_p
         )
+        h = h0 + (h1 - h0) * p
 
         # Configure the output file.
         out_file = out_tpl.format(e = e, n = frame)
@@ -423,16 +470,16 @@ def render_scene(tid, elev, frame, frames, basin_name, basin_name_elev, out_tpl,
         frame += 1
 
         print('Rendering', out_file)
-        print('Pos', pos, '; Foc', foc)
+        print('Pos', pos, '; Foc', foc, '; Height', h)
 
-        if not overwrite and os.path.exists(out_file):
-            print('Exists')
-            continue            
+        #if not overwrite and os.path.exists(out_file):
+        #    print('Exists')
+        #    continue            
 
         # Main part of the command.
         cmd = '''m.nviz.image -a --verbose --overwrite \
-                        elevation_map={dem},{basin} \
-                        color_map={dem_color},{basin_color} \
+                        elevation_map={rasters} \
+                        color_map={colors} \
                         resolution_fine=1 \
                         resolution_coarse=9 \
                         mode={mode} \
@@ -445,19 +492,22 @@ def render_scene(tid, elev, frame, frames, basin_name, basin_name_elev, out_tpl,
                         perspective={persp}'''
 
         params = {
-                'dem' : dem_name,
-                'dem_color' : rgb_name,
-                'basin' : basin_name_elev,
-                'basin_color' :basin_name,
+                'rasters' : dem_name,
+                'colors' : rgb_name,
                 'position' : '{0[0]:0.5f},{0[1]:0.5f}'.format(pos),
                 'focus' : '{0[0]:0.5f},{0[1]:0.5f},{0[2]:0.5f}'.format(foc),
                 'size' : '{0[0]:d},{0[1]:d}'.format(size),
-                'height' : height,
+                'height' : h,
                 'zexag' : zexag,
                 'persp' : perspective,
                 'output' : out_file,
                 'mode' : nviz_mode
         }
+
+        if has_basin:
+                params['rasters'] += ',' + basin_name_elev
+                params['colors'] += ',' + basin_name
+
 
         # Add vline stuff if necessary.
         # TODO: May be conditional in the future.
