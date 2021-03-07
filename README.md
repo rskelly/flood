@@ -46,7 +46,7 @@ number of basins).
 
 At each iteration, the edge pixels of each basin are placed in a [quadtree](https://en.wikipedia.org/wiki/Quadtree), 
 one for each basin. Pairs of trees are searched for pixels within a configured range. For each pair,
-the [A* least-cost search] is used to find the lowest-elevation path from one basin to the other. The end points,
+the [A* least-cost search](https://en.wikipedia.org/wiki/A*_search_algorithm) is used to find the lowest-elevation path from one basin to the other. The end points,
 the path geometry, the current elevation, and the maximum elevation traversed by the path are recorded.
 
 The program also outputs a series of integer rasters, one for each elevation, containing the 
