@@ -35,15 +35,21 @@ Centre](https://www.uvic.ca/research/centres/wcirc/) (W-CIRC) at the University 
 ## Operation
 
 `Flood` takes as input a DTM and an optional list of seed points representing locations
-within basins. If seeds are not provided, the minima in the raster are used. A minimum basin
+within basins. If seeds are not provided, the minima in the raster are used. Starting from the `start`
+elevation and ending at the `end`, the program iteratively
+fills pixels below the current elevation using the [flood fill](https://en.wikipedia.org/wiki/Flood_fill) algorithm. 
+At each iteration, the current elevation is increased by the value of the `step`.
+Regions of filled pixels comprise a "basin" and are given the ID of the seed point. A minimum basin
 area filters out basins that are too small to be of interest (as they grow, basins are rapidly
 subsumed by neighbouring basins so that the many initial seeds coalesce into a more manageable
 number of basins). 
 
-A start and end elevation, and an elevation step are also given. The program
-will "flood" each elevation, step-by-step, from the start to the end (inclusive). 
+At each iteration, the edge pixels of each basin are placed in a [quadtree](https://en.wikipedia.org/wiki/Quadtree), 
+one for each basin. Pairs of trees are searched for pixels within a configured range. For each pair,
+the [A* least-cost search] is used to find the lowest-elevation path from one basin to the other. The end points,
+the path geometry, the current elevation, and the maximum elevation traversed by the path are recorded.
 
-The default output is a series of integer rasters, one for each elevation, containing the 
+The program also outputs a series of integer rasters, one for each elevation, containing the 
 delinated basins. The pixel values are the IDs of the original seeds. Optionally, basins 
 can be vectorized and output to files or a spatial database (PostGIS), though this step can be time-
 consuming.
