@@ -57,6 +57,41 @@ consuming.
 Spill points and path geometries can be output to a CSV file (with line geometries represented
 as WKT linestrings) or to a spatial database.
  
+### Algorithm
+
+1. Choose a starting elevation, a minimum spill distance and (optionally) a minimum basin area. 
+ * The starting elevation is the elevation below which no interesting connections are likely to occur.
+ * The spill distance is the maximum distance between basins which would be considered near enough to possibly connect.
+ * If the algorithm is to use all minima as seeds, select a minimum basin area to eliminate tiny basins which are likely to be subsumed by larger basins early in the process.
+2. Beginning at each seed, “flood” the area around it in the DTM by filling all pixels lower than the chosen flood elevation using the well-known flood-fill algorithm (also known as the “forest fire” algorithm) (Torbert, 2016)⁠. For each basin, assign the value of the seed’s ID
+to the filled pixels for that basin. This produces a new integer raster containing contiguous filled
+regions representing basins.
+3. Using a 9-element kernel, locate all of the edge pixels of each filled basin from the integer
+raster. An edge cell is one that is either on the edge of the raster, or one for which the kernel
+finds a neighbour pixel whose value differs from the value of the center pixel, whether this be
+no data, or the ID of a neighbouring basin. This method will match the edges of interior holes in
+a basin, but this is desirable, as a basin can theoretically occur within another basin.
+4. Place the coordinates of each edge pixel of each basin into a separate KD-tree (Bentley, 1975)⁠ or quadtree 
+corresponding to that basin. A tree data structure is selected because the number of edge cells
+could be extremely large. The expected run time for the search phase would be O(n^2) with a
+naive list comparison, and only O(n) for the KD-tree in the worst case. The expected running
+time for the KD-tree is O(logn). The space complexity of either solution is O(n), so the overhead
+associated with building and storing a tree for each basin is worthwhile. Each tree will be
+identified with the ID of the basin.
+5. Iterate over the list of distinct pairs of seeds. For all edge pixels in the tree corresponding to a
+seed, find the nearest pixel in the tree corresponding to the paired seed.
+6. Perform an A* least-cost search across the DTM for each pair of edge pixels selected in step 5
+whose Cartesian distance is less than the minimum spill distance selected in step 1. The heuristic
+for the search will minimize elevation gain along the path. This will connect each pair of pixels
+along the path most easily followed by the hypothetical drop of water, rather than a simple
+straight line. Note that any path that intersects a filled basin must be discarded – only those that
+cross un-filled space are kept. While constructing the line, record the maximum elevation
+reached by the line, and the coordinate of that point. This will indicate the spill location.
+7. Add the lines produced in step 6 to a database, along with the IDs of the two basins, the fill
+elevation and the coordinate and elevation of the spill point. Geometries for the line, and for
+the spill point may be constructed if the database is spatially enabled.
+Increment the flood elevation chosen in step 1 and repeat from step 2.
+
 ## Installation
 
 `Flood` is designed to run on Linux systems, using the usual `cmake` process:
