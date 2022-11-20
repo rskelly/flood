@@ -103,6 +103,52 @@ Increment the flood elevation chosen in step 1 and repeat from step 2.
 
 Run `flood` to see a usage message.
 
+## Howto
+
+The usage message printed by `flood` provides a listing of parameters available to users:
+
+    Usage: flood <options>
+     -i <file>            Input elevation raster.
+     -s <file>            CSV containing seed points. Row format: gid, x, y, priority. If not given, minima are used.
+     -dbc <conn>          The database connection string for output vectors.
+     -dbl <layer>         The basin database layer name.
+     -dbi <field>         The basin database ID field.
+     -dbe <field>         The basin database elevation field.
+     -dsl <layer>         The spill database layer name.
+     -dsi <field>         The spill database ID field.
+     -dse <field>         The spill database elevation field.
+     -dsm <field>         The spill database maximum elevation field.
+     -dsb <field1,field2> The basin ID fields. Comma-separated list of two column names.
+     -v <dir>             Directory for basin vectors. If not given, they are not produced.
+     -r <dir>             Directory for basin rasters. If not given, they are produced.
+     -p <file>            Spill point file. If not given, they are not produced. A Shapefile or CSV.
+     -start <e>           Starting elevation, in same units as input raster times 10^precision. 
+                          So 200m becomes 200000 if the precision is 3 (the default).
+     -end <e>             Ending elevation. Same precision rule as for start.
+     -step <e>            Step elevation. Same precision rule as for start.
+     -t <t>               Number of threads to use. Default 1.
+     -b <a>               Minimum basin area.
+     -d <d>               Maximum spill distance.
+     -m                   Use file-backed memory for intermediate rasters.
+     -bl <x0,y0,x1,y1,z>  Add a break line of the specified height. In the form <x0,y0,x1,y1,height>.
+     -o                   If given, each elevation will be computed even if raster file exists.
+                          Otherwise, the elevation will be skipped.
+     -a <b>               The source raster band. Default 1.
+     -c <p>               The precision; the number of decimal places to use. Default 3 (mm precision,
+                          when using metric).
+     -g <alpha,radius>    Smooth the raster.
+
+The basic workflow for generating flood basin extents and spill points is as follows:
+<ol>
+<li>Open your favourite GIS program and load a digital elevation, or digital terrain model (DEM or DTM).</li>
+<li>In the GIS program, create some "seed" points. In QGIS, you would select the "New Temporary Scratch Layer" tool, set the Geometry Type field to "Point" and set the coordinate reference system to that of the DTM. Add a new text field called "name". Create points by clicking in the deepest parts of the basins you would like to "connect."</li>
+<li>Save the temporary seed points layer as a CSV file. The file produced by QGIS will need some modification to be compatible with `flood`. The QGIS output fields will be "X", "Y" and "name", plus any additional fields you added to the layer. Add a column, "gid", with integer values starting at one and incrementing by 1. Rename the "X" and "Y" columns to "x" and "y" (lower case).</li>
+<li>Determine the elevation range to "flood": the minimum elevation is where the program starts; choose an elevation low enough that the basins you've seeded are definitely separate. The maximum elevation is where the basins are definitely connected. Be careful not to place the minimum too low or the maximum too high -- you may end up creating many pointless layers.</li>
+<li>Determine a reasonable "step". The step is the amount by which the flood elevation increments on each iteration. If you start at 210m and end at 211m, a step of 1cm will require 100 iterations and produce 100 basin layers.</li>
+<li>Execute the program. Using the inputs created in the previous steps, a minimal execution will look like,
+<pre>flood -i my_dem.tif -s my_seeds.csv -v basin_vectors -r basin_rasters -start 210000 -end 211000 -step 10 -d 100 </pre></li>
+</ol>
+
 ## Eye Candy
 
 [![Youtube Video](https://img.youtube.com/vi/UHseercT3Zg/0.jpg)](https://youtu.be/UHseercT3Zg)
