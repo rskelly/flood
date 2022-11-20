@@ -146,7 +146,15 @@ The basic workflow for generating flood basin extents and spill points is as fol
 <li>Determine the elevation range to "flood": the minimum elevation is where the program starts; choose an elevation low enough that the basins you've seeded are definitely separate. The maximum elevation is where the basins are definitely connected. Be careful not to place the minimum too low or the maximum too high -- you may end up creating many pointless layers.</li>
 <li>Determine a reasonable "step". The step is the amount by which the flood elevation increments on each iteration. If you start at 210m and end at 211m, a step of 1cm will require 100 iterations and produce 100 basin layers.</li>
 <li>Execute the program. Using the inputs created in the previous steps, a minimal execution will look like,
-<pre>flood -i my_dem.tif -s my_seeds.csv -v basin_vectors -r basin_rasters -start 210000 -end 211000 -step 10 -d 100 </pre></li>
+<pre>flood -i my_dem.tif -s my_seeds.csv -v basin_vectors -r basin_rasters -start 210000 -end 211000 -step 10 -d 50 </pre>
+The `my_dem.tif` file is the input DTM and `my_seeds.csv` is the seed file created in step 2. `basin_vectors` and `basin_rasters` are folders created to receive the basin vector and raster files, respectively. The rasters are always created; the vectors are optional and will be skipped if the `-v` parameter is omitted. The `-start`, `-end` and `-step` paramters are described in step 5. Note that the program accepts integers scaled by the parameter, `-c`, which defaults to `3`: this parameter essentially gives the number of decimal places, so the parameter `100` becomes `0.01` (1cm) internally. The final parameter, `-d`gives the maximum distance between basins for a spill path to be computer between them.</li>
+<li>The outputs from this invocation of the program will be, 
+    <ol>
+        <li>A series of integer rasters where each contiguous region represents a basin, whose pixel value is the ID of the seed (the "gid" column).</li>
+        <li>A series of vectors generated from the raster files.</li>
+        <li>A spreadsheed with the spill points, which contains the start and end points, the mid points, and a well-known text representation of the line representing the least-cost path from the start point to the end point. The spill height and the maximum height of the path are also given.</li>
+    </ol>
+</li>
 </ol>
 
 ## Eye Candy
