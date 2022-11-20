@@ -1,6 +1,6 @@
-# Flood
+# flood
 
-`Flood` is an application that delinates basins on a digital terrain 
+`flood` is an application that delinates basins on a digital terrain 
 model (DTM) and attempts to locate the 'spill points' between them.
 
 ## Background
@@ -25,7 +25,7 @@ The relief of the delta is extraordinarily flat. Excluding Shield outcrops,
 over the 5000km<sup>2</sup> expanse of the Delta, the elevation change might be 1-2m. For 
 each basin, there is a definite least-cost path, according to the algorithm 
 (there can't not be!) but this strategy isn't necessarily reflective of 
-real-world processes. The `Flood` algorithm is designed to suggest the locations
+real-world processes. The `flood` algorithm is designed to suggest the locations
 and elevations of *likely* spill points.
 
 This work was begun as part of an internship with [Dr. Daniel Peters](https://profils-profiles.science.gc.ca/en/profile/daniel-l-peters-phd-pgeo), with 
@@ -34,7 +34,7 @@ Centre](https://www.uvic.ca/research/centres/wcirc/) (W-CIRC) at the University 
 
 ## Operation
 
-`Flood` takes as input a DTM and an optional list of seed points representing locations
+`flood` takes as input a DTM and an optional list of seed points representing locations
 within basins. If seeds are not provided, the minima in the raster are used. Starting from the `start`
 elevation and ending at the `end`, the program iteratively
 fills pixels below the current elevation using the [flood fill](https://en.wikipedia.org/wiki/Flood_fill) algorithm. 
@@ -94,7 +94,7 @@ Increment the flood elevation chosen in step 1 and repeat from step 2.
 
 ## Installation
 
-`Flood` is designed to run on Linux systems, using the usual `cmake` process:
+`flood` is designed to run on Linux systems, using the usual `cmake` process:
 
 1) `$ git clone https://github.com/rskelly/flood`
 2) `$ cd flood && mkdir build && cd build`
@@ -138,16 +138,17 @@ The usage message printed by `flood` provides a listing of parameters available 
                           when using metric).
      -g <alpha,radius>    Smooth the raster.
 
+
 The basic workflow for generating flood basin extents and spill points is as follows:
 <ol>
 <li>Open your favourite GIS program and load a digital elevation, or digital terrain model (DEM or DTM).</li>
 <li>In the GIS program, create some "seed" points. In QGIS, you would select the "New Temporary Scratch Layer" tool, set the Geometry Type field to "Point" and set the coordinate reference system to that of the DTM. Add a new text field called "name". Create points by clicking in the deepest parts of the basins you would like to "connect."</li>
-<li>Save the temporary seed points layer as a CSV file. The file produced by QGIS will need some modification to be compatible with `flood`. The QGIS output fields will be "X", "Y" and "name", plus any additional fields you added to the layer. Add a column, "gid", with integer values starting at one and incrementing by 1. Rename the "X" and "Y" columns to "x" and "y" (lower case).</li>
+<li>Save the temporary seed points layer as a CSV file. The file produced by QGIS will need some modification to be compatible with <code>flood</code>. The QGIS output fields will be "X", "Y" and "name", plus any additional fields you added to the layer. Add a column, "gid", with integer values starting at one and incrementing by 1. Rename the "X" and "Y" columns to "x" and "y" (lower case).</li>
 <li>Determine the elevation range to "flood": the minimum elevation is where the program starts; choose an elevation low enough that the basins you've seeded are definitely separate. The maximum elevation is where the basins are definitely connected. Be careful not to place the minimum too low or the maximum too high -- you may end up creating many pointless layers.</li>
 <li>Determine a reasonable "step". The step is the amount by which the flood elevation increments on each iteration. If you start at 210m and end at 211m, a step of 1cm will require 100 iterations and produce 100 basin layers.</li>
 <li>Execute the program. Using the inputs created in the previous steps, a minimal execution will look like,
 <pre>flood -i my_dem.tif -s my_seeds.csv -v basin_vectors -r basin_rasters -start 210000 -end 211000 -step 10 -d 50 </pre>
-The `my_dem.tif` file is the input DTM and `my_seeds.csv` is the seed file created in step 2. `basin_vectors` and `basin_rasters` are folders created to receive the basin vector and raster files, respectively. The rasters are always created; the vectors are optional and will be skipped if the `-v` parameter is omitted. The `-start`, `-end` and `-step` paramters are described in step 5. Note that the program accepts integers scaled by the parameter, `-c`, which defaults to `3`: this parameter essentially gives the number of decimal places, so the parameter `100` becomes `0.01` (1cm) internally. The final parameter, `-d`gives the maximum distance between basins for a spill path to be computer between them.</li>
+The <code>my_dem.tif</code> file is the input DTM and <code>my_seeds.csv</code> is the seed file created in step 2. <code>basin_vectors</code> and <code>basin_rasters</code> are folders created to receive the basin vector and raster files, respectively. The rasters are always created; the vectors are optional and will be skipped if the <code>-v</code> parameter is omitted. The <code>-start</code>, <code>-end</code> and <code>-step</code> paramters are described in step 5. Note that the program accepts integers scaled by the parameter, <code>-c</code>, which defaults to <code>3</code>: this parameter essentially gives the number of decimal places, so the parameter <code>100</code> becomes <code>0.01</code> (1cm) internally. The final parameter, <code>-d</code>gives the maximum distance between basins for a spill path to be computer between them.</li>
 <li>The outputs from this invocation of the program will be, 
     <ol>
         <li>A series of integer rasters where each contiguous region represents a basin, whose pixel value is the ID of the seed (the "gid" column).</li>
