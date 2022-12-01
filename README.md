@@ -1,11 +1,11 @@
 # flood
 
-`flood` is an application that delinates basins on a digital terrain 
-model (DTM) and attempts to locate the 'spill points' between them.
+`flood` is an application that delineates basins on a digital terrain 
+model (DTM) and attempts to locate the 'spill points' or 'connectivity points' between them.
 
 ## Background
 
-Typical watershed and channel delination techniques us a least-cost 
+Typical basin and channel delineation techniques use a least-cost 
 search algorithm to locate the path that a hypothetical water droplet 
 will follow as it moves down slope. This algorithm "floods" basins, 
 from user-defined seeds or surface minima, and locates the 
@@ -15,22 +15,21 @@ each other. When such pairs of pixels are found, the least-cost path
 along with the flood elevation and the maximum height attained by
 the path.
 
-<img src="assets/pad_map.png" alt="Peace-Athabasca Delta" align="right" /> This algorithm was inspired by the unique hydrological conditions ([1](https://onlinelibrary.wiley.com/doi/abs/10.1002/hyp.6420), [2](https://link.springer.com/article/10.1007/s11273-005-1114-1))
+<img src="assets/pad_map.png" alt="Peace-Athabasca Delta" align="right" /> This algorithm was inspired by the challenging hydrological and hydraulic conditions ([1](https://onlinelibrary.wiley.com/doi/abs/10.1002/hyp.6420), [2](https://link.springer.com/article/10.1007/s11273-005-1114-1))
 that prevail in the [Peace-Athabasca Delta](https://en.wikipedia.org/wiki/Peace%E2%80%93Athabasca_Delta) of Northern Alberta, Canada:
-the Delta is littered with "perched" basins that recharge neither
-from precipitation nor groundwater, but from overland spillage due to ice jam
-flooding from the Peace and Athabasca Rivers. 
+the Delta contains "perched" basins that require overland flooding, such as ice jam
+flooding from the Peace and Athabasca Rivers, to offset evaporative losses that are generally greater than precipitation inputs. 
 
 The relief of the delta is extraordinarily flat. Excluding Shield outcrops, 
-over the 5000km<sup>2</sup> expanse of the Delta, the elevation change might be 1-2m. For 
-each basin, there is a definite least-cost path, according to the algorithm 
+over the >5000km<sup>2</sup> expanse of the PAD, the elevation change might be 1-2m over short distances. For 
+each perched basin, there is a definite least-cost path, according to the algorithm 
 (there can't not be!) but this strategy isn't necessarily reflective of 
-real-world processes. The `flood` algorithm is designed to suggest the locations
-and elevations of *likely* spill points.
+real-world processes. The `flood` algorithm is designed to estimate the locations
+and elevations of *likely* points of surface water connectivity.
 
-This work was begun as part of an internship with [Dr. Daniel Peters](https://profils-profiles.science.gc.ca/en/profile/daniel-l-peters-phd-pgeo), with 
-Environment and Climate Change Canada's [Water and Climate Impacts Research 
-Centre](https://www.uvic.ca/research/centres/wcirc/) (W-CIRC) at the University of Victoria.
+This work was begun as part of an internship with [Dr. Daniel Peters](https://profils-profiles.science.gc.ca/en/profile/daniel-l-peters-phd-pgeo) with 
+Environment and Climate Change Canada at the [Water and Climate Impacts Research 
+Centre](https://www.uvic.ca/research/centres/wcirc/) (W-CIRC), located on the campus of the University of Victoria.
 
 ## Operation
 
@@ -50,11 +49,11 @@ the [A* least-cost search](https://en.wikipedia.org/wiki/A*_search_algorithm) is
 the path geometry, the current elevation, and the maximum elevation traversed by the path are recorded.
 
 The program also outputs a series of integer rasters, one for each elevation, containing the 
-delinated basins. The pixel values are the IDs of the original seeds. Optionally, basins 
+delineated basins. The pixel values are the IDs of the original seeds. Optionally, basins 
 can be vectorized and output to files or a spatial database (PostGIS), though this step can be time-
 consuming.
 
-Spill points and path geometries can be output to a CSV file (with line geometries represented
+Spill or connectivity points and path geometries can be output to a CSV file (with line geometries represented
 as WKT linestrings) or to a spatial database.
  
 ### Algorithm
